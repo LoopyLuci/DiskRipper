@@ -1,0 +1,1 @@
+Next generation and production grade quality media backup software called DiskRipper that allows users and agents to be able to quickly and easily be able to backup CD's, DVD's, Blueray disks, with any and all media that may be on them such as video, audio, images, programs, etc.

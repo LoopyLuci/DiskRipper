@@ -1,0 +1,33 @@
+# DiskRipper build artifacts
+/target/
+*.exe
+*.pdb
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Secrets
+.env
+*.key
+*.pfx
+
+# Test output
+/output/
+/test-results/
+
+# Temporary files
+*.tmp
+*.log
+*.bak
+
+# Node modules & frontend build
+node_modules/
+dist/
+.pnp
+.pnp.js

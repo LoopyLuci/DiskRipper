@@ -1,0 +1,75 @@
+{
+  "productName": "DiskRipper",
+  "version": "0.1.0",
+  "identifier": "com.diskripper.app",
+  "build": {
+    "beforeBuildCommand": "cd ../frontend && npm ci && npm run build",
+    "devUrl": "http://localhost:1420",
+    "frontendDist": "../frontend/dist"
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "resources": [],
+    "externalBin": [],
+    "copyright": "2026 LoopyLuci",
+    "category": "Utility",
+    "shortDescription": "Next generation media backup software",
+    "longDescription": "DiskRipper allows users and agents to quickly and easily backup CDs, DVDs, Blu-ray disks with any media on them.",
+    "windows": {
+      "certificateThumbprint": null,
+      "digestAlgorithm": "sha256",
+      "timestampUrl": ""
+    },
+    "linux": {
+      "deb": {
+        "depends": []
+      }
+    },
+    "macOS": {
+      "frameworks": [],
+      "minimumSystemVersion": "10.15",
+      "exceptionDomain": "",
+      "signingIdentity": "",
+      "providerShortName": "",
+      "entitlements": null
+    }
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "DiskRipper",
+        "width": 1200,
+        "height": 800,
+        "minWidth": 900,
+        "minHeight": 600,
+        "resizable": true,
+        "fullscreen": false,
+        "decorations": true
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "plugins": {
+    "updater": {
+      "active": false,
+      "endpoints": [
+        "https://github.com/LoopyLuci/DiskRipper/releases/latest/download/latest.json"
+      ],
+      "dialog": true,
+      "pubkey": ""
+    },
+    "shell": {
+      "open": true
+    }
+  }
+}
