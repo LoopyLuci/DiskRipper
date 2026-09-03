@@ -1,5 +1,6 @@
 //! Machine Learning System for Content Identification and Organization.
 
+pub mod organizer;
 pub mod pipeline;
 pub mod audio_fingerprint;
 pub mod music_identification;
