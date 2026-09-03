@@ -13,6 +13,7 @@ pub mod job;
 pub mod logging;
 pub mod media;
 pub mod metadata;
+pub mod multisession;
 pub mod parallel;
 pub mod progress;
 pub mod rip;
