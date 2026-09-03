@@ -1,4 +1,5 @@
 pub mod audio;
+pub mod audio_cd;
 pub mod disc;
 pub mod drive;
 pub mod error;

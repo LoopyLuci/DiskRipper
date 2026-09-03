@@ -120,6 +120,10 @@ impl JobManager {
         self.jobs.lock().unwrap().get(id).cloned()
     }
 
+    pub fn get_status(&self, id: &JobId) -> JobStatus {
+        self.jobs.lock().unwrap().get(id).map(|j| j.status.clone()).unwrap_or(JobStatus::Failed)
+    }
+
     pub fn list_jobs(&self) -> Vec<Job> {
         let mut jobs: Vec<_> = self.jobs.lock().unwrap().values().cloned().collect();
         jobs.sort_by(|a, b| b.created_at.cmp(&a.created_at));

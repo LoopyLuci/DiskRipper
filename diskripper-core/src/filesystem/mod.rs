@@ -5,11 +5,17 @@ pub mod reader;
 pub mod recovery;
 pub mod verify;
 
+#[cfg(target_os = "windows")]
+pub mod native_win;
+
 pub use iso9660::Iso9660Reader;
 pub use udf::UdfReader;
 pub use raw_io::{RawDiscReader, RawDiscError};
 pub use recovery::{read_sectors_with_retry, read_large_range, verify_checksum, calculate_checksum, ReadConfig, ReadResult};
 pub use verify::{verify_file_rip, verify_disc_image, verify_audio_accuracy, VerificationResult};
+
+#[cfg(target_os = "windows")]
+pub use native_win::{NativeDriveHandle, ThreadSafeDriveHandle, detect_disc_type, read_sectors_with_recovery, BadSectorConfig, DiscTypeInfo, DiscFilesystem, TocTrack};
 
 use crate::error::DiskRipperError;
 use crate::types::FileEntry;
