@@ -28,314 +28,161 @@ export interface Job {
     updated_at: string
   }
   created_at: string
-  updated_at: string
-  error: string | null
-}
-
-export interface AudioTrack {
-  track_number: number
-  start_sector: number
-  end_sector: number
-  duration_seconds: number
-  is_audio: boolean
-}
-
-export interface Settings {
-  default_output_dir: string
-  read_speed: number | null
-  verify_checksums: boolean
-  eject_after_rip: boolean
-  read_retries: number
-  buffer_size_mb: number
-  log_level: string
-  enable_audio_cd: boolean
-  jitter_correction: boolean
-  max_concurrent_jobs: number
-  enable_parallel: boolean
-  theme: string
-  language: string
 }
 
 export interface SystemInfo {
   num_cpus: number
   num_physical_cpus: number
-  total_memory_bytes: number
-  available_memory_bytes: number
-  gpu_devices: GpuDevice[]
+  total_memory_gb: number
+  available_memory_gb: number
+  gpu_info: string[]
+  os_name: string
+  hostname: string
 }
 
-export interface GpuDevice {
-  name: string
-  vendor: string
-  memory_bytes: number
-  platform: string
+export interface AppSettings {
+  default_output_dir: string
+  read_speed: number | null
+  read_retries: number
+  buffer_size_mb: number
+  verify_checksums: boolean
+  eject_after_rip: boolean
+  enable_audio_cd: boolean
+  jitter_correction: boolean
+  log_level: string
+  auto_organize: boolean
+  theme: 'dark' | 'light'
 }
 
-export interface Toast {
-  id: string
-  type: 'success' | 'error' | 'info'
-  message: string
+export const DEFAULT_SETTINGS: AppSettings = {
+  default_output_dir: '',
+  read_speed: null,
+  read_retries: 3,
+  buffer_size_mb: 8,
+  verify_checksums: true,
+  eject_after_rip: false,
+  enable_audio_cd: true,
+  jitter_correction: true,
+  log_level: 'info',
+  auto_organize: true,
+  theme: 'dark',
 }
 
-interface AppState {
+export interface AppState {
   drives: DriveInfo[]
   jobs: Job[]
-  selectedDrive: string | null
-  outputPath: string
+  systemInfo: SystemInfo | null
+  settings: AppSettings
   loading: boolean
   error: string | null
-  settings: Settings | null
-  systemInfo: SystemInfo | null
-  audioTracks: AudioTrack[]
-  toasts: Toast[]
-  
-  refreshDrives: () => Promise<void>
-  refreshJobs: () => Promise<void>
-  selectDrive: (id: string | null) => void
-  setOutputPath: (path: string) => void
-  setError: (error: string | null) => void
-  clearError: () => void
-  
-  startImageRip: (driveId: string, outputPath: string) => Promise<string | null>
-  startExtraction: (driveId: string, outputPath: string) => Promise<string | null>
-  cancelJob: (jobId: string) => Promise<void>
-  removeJob: (jobId: string) => Promise<void>
-  
-  loadSettings: () => Promise<void>
-  saveSettings: (settings: Settings) => Promise<void>
-  resetSettings: () => Promise<void>
-  loadSystemInfo: () => Promise<void>
-  
-  loadAudioTracks: (driveId: string) => Promise<void>
-  extractAudioTrack: (driveId: string, trackNumber: number, outputPath: string) => Promise<void>
-  
-  verifyImageRip: (driveId: string, imagePath: string) => Promise<any>
-  
-  addToast: (type: Toast['type'], message: string) => void
-  removeToast: (id: string) => void
   
   initialize: () => Promise<void>
+  refreshDrives: () => Promise<void>
+  refreshJobs: () => Promise<void>
+  startRip: (driveId: string, outputPath: string) => Promise<string>
+  startExtraction: (driveId: string, outputPath: string) => Promise<string>
+  cancelJob: (jobId: string) => Promise<void>
+  analyzeDrive: (driveId: string) => Promise<any>
+  loadSettings: () => Promise<void>
+  saveSettings: (settings: AppSettings) => Promise<void>
+  resetSettings: () => Promise<void>
+  setTheme: (theme: 'dark' | 'light') => void
+  clearError: () => void
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
   drives: [],
   jobs: [],
-  selectedDrive: null,
-  outputPath: '',
+  systemInfo: null,
+  settings: { ...DEFAULT_SETTINGS, theme: (localStorage.getItem('diskripper-theme') as 'dark' | 'light') || 'dark' },
   loading: false,
   error: null,
-  settings: null,
-  systemInfo: null,
-  audioTracks: [],
-  toasts: [],
+
+  initialize: async () => {
+    const savedTheme = localStorage.getItem('diskripper-theme') as 'dark' | 'light' | null
+    const theme = savedTheme || 'dark'
+    document.documentElement.classList.toggle('light-theme', theme === 'light')
+    
+    await get().loadSettings()
+    await get().refreshDrives()
+    await get().refreshJobs()
+
+    try {
+      await listen('job:update', () => {
+        get().refreshJobs()
+      })
+    } catch (e) {
+      console.log('Event listening not available')
+    }
+  },
 
   refreshDrives: async () => {
+    set({ loading: true, error: null })
     try {
       const drives = await invoke<DriveInfo[]>('list_drives')
-      set({ drives, error: null })
+      set({ drives, loading: false })
     } catch (e) {
-      set({ error: String(e) })
+      set({ error: String(e), loading: false })
     }
   },
 
   refreshJobs: async () => {
     try {
       const jobs = await invoke<Job[]>('list_jobs')
-      set({ jobs, error: null })
+      set({ jobs })
     } catch (e) {
-      set({ error: String(e) })
+      console.log('Failed to refresh jobs:', e)
     }
   },
 
-  selectDrive: (id) => set({ selectedDrive: id }),
-  
-  setOutputPath: (path) => set({ outputPath: path }),
-  
-  setError: (error) => set({ error }),
-  
-  clearError: () => set({ error: null }),
-
-  startImageRip: async (driveId, outputPath) => {
-    set({ loading: true, error: null })
-    try {
-      if (!outputPath.trim()) {
-        throw new Error('Output path is required')
-      }
-      if (!driveId) {
-        throw new Error('No drive selected')
-      }
-      
-      const jobId = await invoke<string>('start_image_rip', { driveId, outputPath })
-      await get().refreshJobs()
-      set({ loading: false })
-      get().addToast('info', 'Image rip started')
-      return jobId
-    } catch (e) {
-      set({ loading: false, error: String(e) })
-      get().addToast('error', `Failed to start rip: ${e}`)
-      return null
-    }
+  startRip: async (driveId: string, outputPath: string) => {
+    const jobId = await invoke<string>('start_image_rip', { driveId, outputPath })
+    await get().refreshJobs()
+    return jobId
   },
 
-  startExtraction: async (driveId, outputPath) => {
-    set({ loading: true, error: null })
-    try {
-      if (!outputPath.trim()) {
-        throw new Error('Output path is required')
-      }
-      if (!driveId) {
-        throw new Error('No drive selected')
-      }
-      
-      const jobId = await invoke<string>('start_extraction', { driveId, outputPath })
-      await get().refreshJobs()
-      set({ loading: false })
-      get().addToast('info', 'Extraction started')
-      return jobId
-    } catch (e) {
-      set({ loading: false, error: String(e) })
-      get().addToast('error', `Failed to start extraction: ${e}`)
-      return null
-    }
+  startExtraction: async (driveId: string, outputPath: string) => {
+    const jobId = await invoke<string>('start_extraction', { driveId, outputPath })
+    await get().refreshJobs()
+    return jobId
   },
 
-  cancelJob: async (jobId) => {
-    try {
-      await invoke('cancel_job', { jobId })
-      await get().refreshJobs()
-      get().addToast('info', 'Job cancelled')
-    } catch (e) {
-      set({ error: String(e) })
-      get().addToast('error', `Failed to cancel job: ${e}`)
-    }
+  cancelJob: async (jobId: string) => {
+    await invoke('cancel_job', { jobId })
+    await get().refreshJobs()
   },
 
-  removeJob: async (jobId) => {
-    try {
-      await invoke('remove_job', { jobId })
-      await get().refreshJobs()
-    } catch (e) {
-      set({ error: String(e) })
-    }
+  analyzeDrive: async (driveId: string) => {
+    return await invoke('analyze_drive', { driveId })
   },
 
   loadSettings: async () => {
     try {
-      const settings = await invoke<Settings>('load_settings')
-      set({ settings })
+      const saved = localStorage.getItem('diskripper-settings')
+      if (saved) {
+        const parsed = JSON.parse(saved)
+        set({ settings: { ...DEFAULT_SETTINGS, ...parsed } })
+      }
     } catch (e) {
-      set({ error: String(e) })
+      console.log('Failed to load settings:', e)
     }
   },
 
-  saveSettings: async (settings) => {
-    try {
-      await invoke('save_settings', { settings })
-      set({ settings })
-      get().addToast('success', 'Settings saved')
-    } catch (e) {
-      set({ error: String(e) })
-      get().addToast('error', `Failed to save settings: ${e}`)
-    }
+  saveSettings: async (settings: AppSettings) => {
+    localStorage.setItem('diskripper-settings', JSON.stringify(settings))
+    set({ settings })
   },
 
   resetSettings: async () => {
-    try {
-      const settings = await invoke<Settings>('reset_settings')
-      set({ settings })
-      get().addToast('success', 'Settings reset to defaults')
-    } catch (e) {
-      set({ error: String(e) })
-    }
+    localStorage.removeItem('diskripper-settings')
+    set({ settings: DEFAULT_SETTINGS })
   },
 
-  loadSystemInfo: async () => {
-    try {
-      const info = await invoke<SystemInfo>('get_system_info')
-      set({ systemInfo: info })
-    } catch (e) {
-      // System info is optional, don't show error
-      console.debug('System info not available:', e)
-    }
+  setTheme: (theme: 'dark' | 'light') => {
+    localStorage.setItem('diskripper-theme', theme)
+    document.documentElement.classList.toggle('light-theme', theme === 'light')
+    set((state) => ({ settings: { ...state.settings, theme } }))
   },
 
-  loadAudioTracks: async (driveId) => {
-    try {
-      const tracks = await invoke<AudioTrack[]>('get_audio_tracks', { driveId })
-      set({ audioTracks: tracks })
-    } catch (e) {
-      set({ error: String(e) })
-    }
-  },
-
-  extractAudioTrack: async (driveId, trackNumber, outputPath) => {
-    set({ loading: true, error: null })
-    try {
-      if (!outputPath.trim()) {
-        throw new Error('Output path is required')
-      }
-      await invoke('extract_audio_track_to_wav', { driveId, trackNumber, outputPath })
-      set({ loading: false })
-      get().addToast('success', `Track ${trackNumber} extracted`)
-    } catch (e) {
-      set({ loading: false, error: String(e) })
-      get().addToast('error', `Failed to extract track: ${e}`)
-    }
-  },
-
-  verifyImageRip: async (driveId, imagePath) => {
-    set({ loading: true, error: null })
-    try {
-      const result = await invoke('verify_image_rip', { driveId, imagePath })
-      set({ loading: false })
-      get().addToast('success', 'Verification complete')
-      return result
-    } catch (e) {
-      set({ loading: false, error: String(e) })
-      get().addToast('error', `Verification failed: ${e}`)
-      return null
-    }
-  },
-
-  addToast: (type, message) => {
-    const id = crypto.randomUUID()
-    set((state) => ({ toasts: [...state.toasts, { id, type, message }] }))
-    setTimeout(() => {
-      get().removeToast(id)
-    }, 5000)
-  },
-
-  removeToast: (id) => {
-    set((state) => ({ toasts: state.toasts.filter((t) => t.id !== id) }))
-  },
-
-  initialize: async () => {
-    await get().refreshDrives()
-    await get().refreshJobs()
-    await get().loadSettings()
-    await get().loadSystemInfo()
-    
-    const settings = get().settings
-    if (settings) {
-      set({ outputPath: settings.default_output_dir })
-    } else {
-      const defaultPath = await invoke<string>('get_default_output_path')
-      set({ outputPath: defaultPath })
-    }
-    
-    // Listen for job events from backend
-    await listen('job:update', () => {
-      get().refreshJobs()
-    })
-    
-    await listen('job:completed', (event) => {
-      get().refreshJobs()
-      get().addToast('success', 'Job completed')
-    })
-    
-    await listen('job:failed', (event) => {
-      get().refreshJobs()
-      get().addToast('error', `Job failed: ${event.payload}`)
-    })
-  },
+  clearError: () => set({ error: null }),
 }))

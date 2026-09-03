@@ -158,6 +158,27 @@ export function SettingsPanel() {
         </div>
       </div>
 
+      <div className="bg-[#1e293b] rounded-xl p-5 border border-[#334155] space-y-4">
+        <h3 className="text-sm font-semibold text-white">Theme</h3>
+        <div>
+          <label className="text-xs text-slate-400 block mb-1">Appearance</label>
+          <select
+            value={localSettings.theme}
+            onChange={(e) => {
+              const theme = e.target.value as 'dark' | 'light'
+              setLocalSettings({ ...localSettings, theme })
+              // Apply theme immediately
+              document.documentElement.classList.toggle('light-theme', theme === 'light')
+              localStorage.setItem('diskripper-theme', theme)
+            }}
+            className="w-full bg-[#0f172a] border border-[#334155] rounded-lg px-3 py-2 text-sm text-white"
+          >
+            <option value="dark">Dark</option>
+            <option value="light">Light</option>
+          </select>
+        </div>
+      </div>
+
       <div className="flex gap-3">
         <button
           onClick={handleSave}

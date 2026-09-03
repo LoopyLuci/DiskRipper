@@ -14,6 +14,10 @@ struct Cli {
     #[command(subcommand)]
     command: Commands,
     
+    /// Output in JSON format (for automation)
+    #[arg(short, long, global = true)]
+    json: bool,
+    
     /// Enable verbose output
     #[arg(short, long, global = true)]
     verbose: bool,
@@ -53,6 +57,12 @@ enum Commands {
     ListJobs,
     JobStatus { job_id: String },
     CancelJob { job_id: String },
+    BatchRip {
+        #[arg(short, long, value_delimiter = ',')]
+        drives: Vec<String>,
+        #[arg(short, long)]
+        output_dir: PathBuf,
+    },
 }
 
 fn main() {
@@ -75,6 +85,9 @@ fn main() {
         Commands::ListJobs => cmd_list_jobs(&engine),
         Commands::JobStatus { job_id } => cmd_job_status(&engine, job_id),
         Commands::CancelJob { job_id } => rt.block_on(cmd_cancel_job(&engine, job_id)),
+        Commands::BatchRip { drives, output_dir } => {
+            rt.block_on(cmd_batch_rip(&engine, &drives, &output_dir));
+        }
     }
 }
 
@@ -253,6 +266,28 @@ async fn cmd_cancel_job(engine: &RipEngine, job_id: String) {
             std::process::exit(1);
         }
     }
+}
+
+async fn cmd_batch_rip(engine: &RipEngine, drives: &[String], output_dir: &Path) {
+    println!("Batch ripping {} drives to {}", drives.len(), output_dir.display());
+    
+    for (i, drive_id) in drives.iter().enumerate() {
+        println!("\n[{}] Ripping drive {}", i + 1, drive_id);
+        let output = output_dir.join(format!("disc_{}.iso", i + 1));
+        let options = diskripper_core::types::ImageOptions::default();
+        
+        match engine.start_image_rip(drive_id, &output, options).await {
+            Ok(job_id) => {
+                println!("Job started: {}", job_id);
+                wait_for_job(engine, &job_id.0).await;
+            }
+            Err(e) => {
+                eprintln!("Error ripping drive {}: {}", drive_id, e);
+            }
+        }
+    }
+    
+    println!("\nBatch rip complete!");
 }
 
 async fn wait_for_job(engine: &RipEngine, job_id: &str) {
