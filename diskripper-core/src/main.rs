@@ -35,7 +35,7 @@ enum Commands {
         #[arg(long)]
         verify: bool,
         #[arg(long)]
-        eject: bool,
+        auto_organize: bool,
     },
     Extract {
         #[arg(short, long)]
@@ -66,8 +66,8 @@ fn main() {
     match cli.command {
         Commands::ListDrives => cmd_list_drives(&engine),
         Commands::DriveInfo { drive_id } => cmd_drive_info(&engine, drive_id),
-        Commands::Rip { drive, output, verify: _, eject } => {
-            rt.block_on(cmd_rip(&engine, &drive, &output, eject));
+        Commands::Rip { drive, output, verify: _, auto_organize } => {
+            rt.block_on(cmd_rip(&engine, &drive, &output, auto_organize));
         }
         Commands::Extract { drive, output } => rt.block_on(cmd_extract(&engine, &drive, &output)),
         Commands::Verify { drive, image } => rt.block_on(cmd_verify(&engine, &drive, &image)),
@@ -105,20 +105,59 @@ fn cmd_drive_info(engine: &RipEngine, drive_id: String) {
     }
 }
 
-async fn cmd_rip(engine: &RipEngine, drive_id: &str, output: &Path, eject: bool) {
+async fn cmd_rip(engine: &RipEngine, drive_id: &str, output: &Path, auto_organize: bool) {
     println!("Ripping drive {} to {}", drive_id, output.display());
     let options = diskripper_core::types::ImageOptions::default();
     match engine.start_image_rip(drive_id, output, options).await {
         Ok(job_id) => {
             println!("Job started: {}", job_id);
             wait_for_job(engine, &job_id.0).await;
-            if eject { println!("Eject requested"); }
+
+            // Auto-organize if requested
+            if auto_organize && output.is_file() {
+                println!("Running ML identification...");
+                // Try to read the ripped file for identification
+                if let Ok(audio_data) = read_audio_for_identification(output) {
+                    match engine.identify_audio(&audio_data, 44100) {
+                        Ok(result) => {
+                            println!("Identified: {} (confidence: {:.1}%)",
+                                result.title.as_deref().unwrap_or("Unknown"),
+                                result.confidence * 100.0);
+                            if let Ok(org) = engine.organize_file(output, &result) {
+                                println!("Organized to: {}", org.organized_path);
+                            }
+                        }
+                        Err(e) => eprintln!("Identification failed: {}", e),
+                    }
+                }
+            }
         }
         Err(e) => {
             eprintln!("Error: {}", e);
             std::process::exit(1);
         }
     }
+}
+
+/// Try to read audio data from a file for ML identification
+fn read_audio_for_identification(path: &Path) -> Result<Vec<i16>, Box<dyn std::error::Error>> {
+    // For WAV files, read the audio data
+    if path.extension().and_then(|e| e.to_str()) == Some("wav") {
+        use std::io::Read;
+        let mut file = std::fs::File::open(path)?;
+        let mut buffer = Vec::new();
+        file.read_to_end(&mut buffer)?;
+        
+        // Skip WAV header (44 bytes) and convert to i16 samples
+        if buffer.len() > 44 {
+            let samples: Vec<i16> = buffer[44..]
+                .chunks_exact(2)
+                .map(|chunk| i16::from_le_bytes([chunk[0], chunk[1]]))
+                .collect();
+            return Ok(samples);
+        }
+    }
+    Err("Unsupported format".into())
 }
 
 async fn cmd_extract(engine: &RipEngine, drive_id: &str, output: &Path) {

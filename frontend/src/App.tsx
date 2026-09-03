@@ -1,3 +1,4 @@
+import { MLPanel } from './components/MLPanel'
 import { useState, useEffect } from 'react'
 import { Header } from './components/Header'
 import { Sidebar } from './components/Sidebar'
@@ -12,7 +13,7 @@ import { VerifyPanel } from './components/VerifyPanel'
 import { FeedbackDialog } from './components/FeedbackDialog'
 import { useAppStore } from './store'
 
-export type View = 'drives' | 'jobs' | 'audio' | 'verify' | 'settings'
+export type View = 'drives' | 'jobs' | 'audio' | 'verify' | 'ml' | 'settings'
 
 function App() {
   const [currentView, setCurrentView] = useState<View>('drives')
@@ -61,6 +62,7 @@ function App() {
           {currentView === 'jobs' && <JobPanel />}
           {currentView === 'audio' && <AudioCdPanel />}
           {currentView === 'verify' && <VerifyPanel />}
+          {currentView === 'ml' && <MLPanel />}
           {currentView === 'settings' && <SettingsPanel />}
         </main>
       </div>

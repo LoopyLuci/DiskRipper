@@ -1,4 +1,4 @@
-import { HardDrive, Disc3, Settings, Activity, FileCheck, Music } from 'lucide-react'
+import { HardDrive, Disc3, Settings, Activity, FileCheck, Music, Brain } from 'lucide-react'
 import type { View } from '../App'
 
 interface SidebarProps {
@@ -12,6 +12,7 @@ export function Sidebar({ currentView, onViewChange }: SidebarProps) {
     { id: 'jobs', label: 'Jobs', icon: <Activity size={20} /> },
     { id: 'audio', label: 'Audio CD', icon: <Music size={20} /> },
     { id: 'verify', label: 'Verify', icon: <FileCheck size={20} /> },
+    { id: 'ml', label: 'ML Identify', icon: <Brain size={20} /> },
     { id: 'settings', label: 'Settings', icon: <Settings size={20} /> },
   ]
 

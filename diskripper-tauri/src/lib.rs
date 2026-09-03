@@ -48,6 +48,50 @@ fn start_extraction(
 }
 
 #[tauri::command]
+fn identify_audio(
+    audio_data: Vec<i16>,
+    sample_rate: u32,
+    engine: State<'_, RipEngine>,
+) -> Result<diskripper_core::ml::pipeline::PipelineResult, String> {
+    engine
+        .identify_audio(&audio_data, sample_rate)
+        .map_err(|e| format!("Identification failed: {}", e))
+}
+
+#[tauri::command]
+fn submit_feedback(
+    feedback: diskripper_core::ml::self_learning::FeedbackEntry,
+    engine: State<'_, RipEngine>,
+) -> Result<(), String> {
+    engine
+        .submit_feedback(feedback)
+        .map_err(|e| format!("Failed to submit feedback: {}", e))
+}
+
+#[tauri::command]
+fn organize_file(
+    file_path: String,
+    identification: diskripper_core::ml::pipeline::PipelineResult,
+    engine: State<'_, RipEngine>,
+) -> Result<diskripper_core::ml::organizer::OrganizationResult, String> {
+    let path = std::path::PathBuf::from(file_path);
+    engine
+        .organize_file(&path, &identification)
+        .map_err(|e| format!("Organization failed: {}", e))
+}
+
+#[tauri::command]
+fn extract_audio_features(
+    audio_data: Vec<i16>,
+    sample_rate: u32,
+    engine: State<'_, RipEngine>,
+) -> Result<diskripper_core::ml::feature_extraction::Features, String> {
+    engine
+        .extract_audio_features(&audio_data, sample_rate)
+        .map_err(|e| format!("Feature extraction failed: {}", e))
+}
+
+#[tauri::command]
 fn cancel_job(job_id: String, engine: State<'_, RipEngine>) -> Result<(), String> {
     let id = JobId(job_id);
     tauri::async_runtime::block_on(engine.cancel_job(&id))

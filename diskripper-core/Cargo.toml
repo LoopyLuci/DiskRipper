@@ -30,6 +30,7 @@ tokio-util.workspace = true
 dirs.workspace = true
 base64.workspace = true
 clap.workspace = true
+directories.workspace = true
 num_cpus.workspace = true
 rayon.workspace = true
 fastrand.workspace = true

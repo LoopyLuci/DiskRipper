@@ -10,6 +10,7 @@ use crate::extract::Extractor;
 use crate::icons::IconManager;
 use crate::image::Imager;
 use crate::job::{JobManager, JobStatus};
+use crate::ml;
 use crate::types::*;
 
 pub struct RipEngine {
@@ -17,15 +18,37 @@ pub struct RipEngine {
     disc_analyzer: PlatformDiscAnalyzer,
     job_manager: Arc<JobManager>,
     active_jobs: Arc<Mutex<Vec<JobId>>>,
+    pub ml_pipeline: Arc<ml::pipeline::MlPipeline>,
+    pub organizer: Arc<ml::organizer::SmartOrganizer>,
 }
 
 impl RipEngine {
     pub fn new() -> Self {
+        let dirs = directories::ProjectDirs::from("com", "diskripper", "DiskRipper")
+            .expect("Failed to determine project dirs");
+        let model_dir = dirs.data_dir().join("ml_models");
+        let feedback_dir = dirs.data_dir().join("feedback");
+        let output_dir = dirs.data_dir().join("organized");
+
+        let pipeline = ml::pipeline::MlPipeline::new(ml::pipeline::PipelineConfig {
+            model_dir: model_dir.clone(),
+            data_dir: model_dir.join("data"),
+            feedback_dir: feedback_dir.clone(),
+            enable_self_learning: true,
+            confidence_threshold: 0.7,
+            max_batch_size: 32,
+            enable_gpu: false,
+        })
+        .expect("Failed to create ML pipeline");
+        let organizer = ml::organizer::SmartOrganizer::new(&output_dir);
+
         Self {
             drive_scanner: PlatformDriveScanner::new(),
             disc_analyzer: PlatformDiscAnalyzer::new(),
             job_manager: Arc::new(JobManager::new()),
             active_jobs: Arc::new(Mutex::new(Vec::new())),
+            ml_pipeline: Arc::new(pipeline),
+            organizer: Arc::new(organizer),
         }
     }
 
@@ -43,6 +66,51 @@ impl RipEngine {
         self.job_manager.clone()
     }
 
+    /// Identify audio content using ML
+    pub fn identify_audio(
+        &self,
+        audio_data: &[i16],
+        sample_rate: u32,
+    ) -> Result<ml::pipeline::PipelineResult, DiskRipperError> {
+        self.ml_pipeline.identify_audio(audio_data, sample_rate)
+    }
+
+    /// Organize a ripped file using ML identification
+    pub fn organize_file(
+        &self,
+        file_path: &Path,
+        identification: &ml::pipeline::PipelineResult,
+    ) -> Result<ml::organizer::OrganizationResult, DiskRipperError> {
+        self.organizer.organize(file_path, identification)
+    }
+
+    /// Extract features from audio for ML training
+    pub fn extract_audio_features(
+        &self,
+        audio_data: &[i16],
+        sample_rate: u32,
+    ) -> Result<ml::feature_extraction::Features, DiskRipperError> {
+        ml::feature_extraction::AudioFeatureExtractor::extract(audio_data, sample_rate)
+    }
+
+    /// Submit feedback for ML training
+    pub fn submit_feedback(
+        &self,
+        feedback: ml::self_learning::FeedbackEntry,
+    ) -> Result<(), DiskRipperError> {
+        let feedback_dir = self.ml_pipeline.config.feedback_dir.clone();
+        std::fs::create_dir_all(&feedback_dir)
+            .map_err(|e| DiskRipperError::Io(format!("Failed to create feedback dir: {}", e)))?;
+
+        let path = feedback_dir.join(format!("feedback_{}.json", feedback.id));
+        let json = serde_json::to_string_pretty(&feedback)
+            .map_err(|e| DiskRipperError::Io(format!("Failed to serialize feedback: {}", e)))?;
+        std::fs::write(&path, json)
+            .map_err(|e| DiskRipperError::Io(format!("Failed to write feedback: {}", e)))?;
+
+        Ok(())
+    }
+
     pub async fn start_image_rip(
         &self,
         drive_id: &str,
@@ -53,7 +121,6 @@ impl RipEngine {
             .ok_or_else(|| DiskRipperError::DriveNotFound(drive_id.to_string()))?;
         let mut disc_info = self.disc_analyzer.analyze(&drive.path)?;
         
-        // Try to get actual disc size if available
         if let Some(actual_size) = self.disc_analyzer.get_disc_size(&drive.path) {
             if actual_size > 0 {
                 disc_info.total_size = actual_size;
@@ -109,19 +176,12 @@ impl RipEngine {
         let active = self.active_jobs.clone();
         let drive_path = drive.path.clone();
         let out = output_path.to_path_buf();
-        let cancel_token = jm.get_cancellation_token(&job_id).unwrap_or_default();
 
         tokio::spawn(async move {
             active.lock().await.push(jid.clone());
             
-            if cancel_token.is_cancelled() {
-                let _ = jm.set_status(&jid, JobStatus::Cancelled);
-                active.lock().await.retain(|id| id != &jid);
-                return;
-            }
-            
-            let engine = Extractor::new(jm.clone(), jid.clone(), drive_path, out, options);
-            if let Err(e) = engine.run().await {
+            let extractor = Extractor::new(jm.clone(), jid.clone(), drive_path, out, options);
+            if let Err(e) = extractor.run().await {
                 error!(job_id = %jid, error = %e, "Extraction failed");
                 let _ = jm.set_error(&jid, e.to_string());
             }
@@ -132,12 +192,6 @@ impl RipEngine {
     }
 
     pub async fn cancel_job(&self, job_id: &JobId) -> Result<(), DiskRipperError> {
-        self.job_manager.cancel_job(job_id)
-    }
-}
-
-impl Default for RipEngine {
-    fn default() -> Self {
-        Self::new()
+        self.job_manager.set_status(job_id, JobStatus::Cancelled)
     }
 }

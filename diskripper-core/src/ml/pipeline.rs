@@ -45,7 +45,7 @@ impl Default for PipelineConfig {
 
 /// Main ML Pipeline
 pub struct MlPipeline {
-    config: PipelineConfig,
+    pub config: PipelineConfig,
     // Sub-models
     pub audio_fingerprinter: crate::ml::audio_fingerprint::AudioFingerprinter,
     pub music_identifier: crate::ml::music_identification::MusicIdentifier,
