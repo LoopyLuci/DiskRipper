@@ -1,7 +1,7 @@
 [package]
 name = "diskripper-core"
 version.workspace = true
-edition.workspace = true
+edition = "2024"
 license.workspace = true
 description = "Core engine for optical media backup"
 
@@ -25,9 +25,12 @@ bytes.workspace = true
 async-trait.workspace = true
 futures.workspace = true
 tokio-util.workspace = true
-dirs = "5"
+dirs.workspace = true
 base64.workspace = true
 clap.workspace = true
+num_cpus.workspace = true
+rayon.workspace = true
+windows-sys = { workspace = true }
 
 [target.'cfg(windows)'.dependencies]
 windows = { version = "0.58", features = [
@@ -35,7 +38,10 @@ windows = { version = "0.58", features = [
     "Win32_System_IO",
     "Win32_Foundation",
     "Win32_Security",
+    "Win32_System_Threading",
+    "Win32_System_LibraryLoader",
 ] }
+tokio-util.workspace = true
 
 [target.'cfg(target_os = "linux")'.dependencies]
 libc = "0.2"

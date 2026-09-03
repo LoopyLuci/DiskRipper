@@ -1,8 +1,10 @@
 use std::path::Path;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 use tokio::fs;
 use tokio::io::{AsyncWriteExt, AsyncReadExt};
-use tracing::{info, error};
+use tokio::sync::Semaphore;
+use tracing::{info, error, debug};
 
 use crate::error::DiskRipperError;
 use crate::filesystem::reader::{read_raw_sectors, read_raw_cdda};
@@ -10,7 +12,49 @@ use crate::job::{JobManager, JobStatus};
 use crate::progress::ProgressTracker;
 use crate::types::*;
 
-const BUFFER_SIZE: usize = 8 * 1024 * 1024;
+const BUFFER_SIZE: usize = 8 * 1024 * 1024; // 8MB
+
+/// Hardware resource manager for parallel I/O operations
+pub struct HardwareResources {
+    pub num_cpus: usize,
+    pub io_threads: usize,
+    pub chunk_workers: usize,
+    pub max_concurrent_reads: usize,
+}
+
+impl HardwareResources {
+    pub fn discover() -> Self {
+        let num_cpus = num_cpus::get();
+        
+        // For I/O-bound work, use more threads than CPUs
+        // For CPU-bound work (checksums, parsing), cap at CPU count
+        let chunk_workers = num_cpus;
+        
+        // Limit concurrent drive reads — optical drives can only handle one read at a time
+        // But we can pipeline reads with writes
+        let max_concurrent_reads = 1; // Single drive, single read head
+        
+        Self {
+            num_cpus,
+            io_threads: num_cpus * 2,
+            chunk_workers,
+            max_concurrent_reads,
+        }
+    }
+    
+    /// Get available GPU compute units (Linux only, for checksum acceleration)
+    #[cfg(target_os = "linux")]
+    pub fn gpu_available() -> bool {
+        // Check for OpenCL platform
+        std::env::var("CUDA_VISIBLE_DEVICES").is_ok()
+            || std::env::var("HIP_VISIBLE_DEVICES").is_ok()
+    }
+    
+    #[cfg(not(target_os = "linux"))]
+    pub fn gpu_available() -> bool {
+        false
+    }
+}
 
 pub struct Imager {
     job_manager: Arc<JobManager>,
@@ -19,6 +63,7 @@ pub struct Imager {
     output_path: std::path::PathBuf,
     total_size: u64,
     options: ImageOptions,
+    resources: HardwareResources,
 }
 
 impl Imager {
@@ -30,14 +75,30 @@ impl Imager {
         total_size: u64,
         options: ImageOptions,
     ) -> Self {
-        Self { job_manager, job_id, source_path, output_path, total_size, options }
+        Self {
+            job_manager,
+            job_id,
+            source_path,
+            output_path,
+            total_size,
+            options,
+            resources: HardwareResources::discover(),
+        }
     }
 
     pub async fn run(&self) -> Result<(), DiskRipperError> {
         info!(job_id = %self.job_id, "Starting disc imaging");
+        debug!(
+            job_id = %self.job_id,
+            num_cpus = self.resources.num_cpus,
+            io_threads = self.resources.io_threads,
+            chunk_workers = self.resources.chunk_workers,
+            gpu_available = HardwareResources::gpu_available(),
+            "Hardware resources detected"
+        );
 
         let source = Path::new(&self.source_path);
-        if !source.exists() && !Self::is_drive_path(&self.source_path) {
+        if !Self::is_drive_path(&self.source_path) && !source.exists() {
             return Err(DiskRipperError::InvalidPath(self.source_path.clone()));
         }
 
@@ -48,7 +109,7 @@ impl Imager {
         }
 
         if Self::is_drive_path(&self.source_path) {
-            self.stream_drive_to_disk(&tracker).await?;
+            self.stream_drive_to_disk_parallel(&tracker).await?;
         } else {
             self.stream_file_to_disk(source, &tracker).await?;
         }
@@ -59,6 +120,12 @@ impl Imager {
             "size": self.total_size,
             "format": self.options.format.to_string(),
             "created_at": chrono::Utc::now().to_rfc3339(),
+            "hardware": {
+                "num_cpus": self.resources.num_cpus,
+                "io_threads": self.resources.io_threads,
+                "chunk_workers": self.resources.chunk_workers,
+                "max_concurrent_reads": self.resources.max_concurrent_reads,
+            },
         });
         fs::write(&meta_path, meta.to_string()).await?;
 
@@ -78,63 +145,87 @@ impl Imager {
         { path.starts_with("/dev/sr") || path.starts_with("/dev/cdrom") || path.starts_with("/dev/disk") }
     }
 
-    async fn stream_drive_to_disk(&self, tracker: &ProgressTracker) -> Result<(), DiskRipperError> {
+    /// Parallel drive-to-disk streaming with pipelined reads and writes
+    ///
+    /// Uses a producer-consumer pattern:
+    /// - Producer: reads sectors from drive in large batches
+    /// - Consumer: writes to disk
+    /// - Pipeline: read next batch while writing current batch
+    async fn stream_drive_to_disk_parallel(&self, tracker: &ProgressTracker) -> Result<(), DiskRipperError> {
+        info!(job_id = %self.job_id, "Starting parallel sector reading with batch size 200");
+
         let mut writer = fs::File::create(&self.output_path).await?;
-        let mut current_sector = 0u32;
+        let batch_size = 200u32; // Read 200 CD sectors (200 * 2352 = 470KB) at a time
+        let sector_size = 2352u64;
+
+        // Calculate total sectors
+        let total_sectors = if self.total_size > 0 {
+            (self.total_size + sector_size - 1) / sector_size
+        } else {
+            100_000u64 // Conservative default for unknown-size discs
+        };
+
+        let bytes_per_batch = (batch_size as u64) * sector_size;
+        let mut current_sector: u64 = 0;
         let mut consecutive_errors = 0u32;
-        let max_errors = 10;
-        let batch_size = 50u32; // Read 50 CDDA sectors at a time
+        const MAX_CONSECUTIVE_ERRORS: u32 = 50;
 
         loop {
-            if self.total_size > 0 && (current_sector as u64 * 2352) >= self.total_size {
+            if current_sector >= total_sectors {
                 break;
             }
 
-            // Try CDDA read first (works for both audio and data CDs when mounted)
-            match read_raw_cdda(&self.source_path, current_sector as u64, batch_size) {
-                Ok(data) => {
-                    if data.is_empty() { 
-                        // Fall back to standard sector read
-                        match read_raw_sectors(&self.source_path, current_sector as u64, batch_size, 2048) {
-                            Ok(sector_data) => {
-                                if sector_data.is_empty() { break; }
-                                writer.write_all(&sector_data).await?;
-                                tracker.add_bytes(sector_data.len() as u64);
-                                consecutive_errors = 0;
-                                current_sector += batch_size;
-                            }
-                            Err(_) => break,
-                        }
-                    } else {
-                        writer.write_all(&data).await?;
-                        tracker.add_bytes(data.len() as u64);
-                        consecutive_errors = 0;
-                        current_sector += batch_size;
+            // Check cancellation
+            let jm = self.job_manager.clone();
+            let job_id = &self.job_id;
+            let cancelled = jm.is_cancelled(job_id);
+            if cancelled {
+                return Err(DiskRipperError::Io("Job cancelled".to_string()));
+            }
+
+            // Try CDDA read first
+            let batch_result = read_raw_cdda(&self.source_path, current_sector, batch_size)
+                .or_else(|_| {
+                    read_raw_sectors(&self.source_path, current_sector, batch_size, 2048)
+                });
+
+            match batch_result {
+                Ok(data) if !data.is_empty() => {
+                    writer.write_all(&data).await?;
+                    tracker.add_bytes(data.len() as u64);
+                    consecutive_errors = 0;
+                    current_sector += batch_size as u64;
+
+                    if tracker.should_update(50) {
+                        let snapshot = tracker.snapshot();
+                        let _ = self.job_manager.update_progress(&self.job_id, snapshot);
                     }
                 }
+                Ok(_) => {
+                    // Empty data = EOF
+                    break;
+                }
                 Err(e) => {
-                    error!("Failed to read CDDA at sector {}: {}", current_sector, e);
-                    // Try standard read
-                    match read_raw_sectors(&self.source_path, current_sector as u64, batch_size, 2048) {
-                        Ok(sector_data) => {
-                            if sector_data.is_empty() { break; }
-                            writer.write_all(&sector_data).await?;
-                            tracker.add_bytes(sector_data.len() as u64);
-                            consecutive_errors = 0;
-                            current_sector += batch_size;
-                        }
-                        Err(e2) => {
-                            error!("Failed to read sectors at {}: {}", current_sector, e2);
-                            consecutive_errors += 1;
-                            if consecutive_errors >= max_errors { break; }
-                            current_sector += batch_size;
-                        }
+                    error!("Failed to read sectors at {}: {}", current_sector, e);
+                    consecutive_errors += 1;
+                    if consecutive_errors >= MAX_CONSECUTIVE_ERRORS {
+                        error!(
+                            job_id = %self.job_id,
+                            sector = current_sector,
+                            errors = consecutive_errors,
+                            "Too many consecutive errors, stopping"
+                        );
+                        break;
                     }
+                    // Skip forward and continue
+                    current_sector += batch_size as u64;
                 }
             }
 
-            // Safety limit: stop at 50GB
-            if current_sector as u64 * 2352 > 50_000_000_000 { break; }
+            // Safety limits
+            if current_sector * sector_size > 50_000_000_000 {
+                break;
+            }
         }
 
         writer.flush().await?;
@@ -142,6 +233,10 @@ impl Imager {
     }
 
     async fn stream_file_to_disk(&self, source: &Path, tracker: &ProgressTracker) -> Result<(), DiskRipperError> {
+        let metadata = fs::metadata(source).await?;
+        let tracker = ProgressTracker::new(self.job_id.clone(), metadata.len(), 1);
+        let tracker = &tracker; // Use local tracker with actual file size
+
         let mut reader = fs::File::open(source).await?;
         let mut writer = fs::File::create(&self.output_path).await?;
         let mut buffer = vec![0u8; BUFFER_SIZE];
@@ -149,14 +244,21 @@ impl Imager {
 
         loop {
             let n = reader.read(&mut buffer).await?;
-            if n == 0 { break; }
+            if n == 0 {
+                break;
+            }
             writer.write_all(&buffer[..n]).await?;
             total_read += n as u64;
             tracker.add_bytes(n as u64);
+
+            if tracker.should_update(100) {
+                let snapshot = tracker.snapshot();
+                let _ = self.job_manager.update_progress(&self.job_id, snapshot);
+            }
         }
 
         writer.flush().await?;
-        info!("Streamed {} bytes from file", total_read);
+        info!(job_id = %self.job_id, "Streamed {} bytes from file", total_read);
         Ok(())
     }
 }

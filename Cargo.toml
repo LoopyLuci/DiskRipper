@@ -6,7 +6,7 @@ resolver = "2"
 version = "0.1.0"
 edition = "2024"
 license = "MIT"
-repository = "https://github.com/LoopyLuci/DiskRippers"
+repository = "https://github.com/LoopyLuci/DiskRipper"
 description = "DiskRipper - Next generation media backup software"
 
 [workspace.dependencies]
@@ -29,7 +29,17 @@ hex = "0.4"
 bytes = "1"
 async-trait = "0.1"
 futures = "0.3"
-tokio-util = "0.7"
+tokio-util = { version = "0.7", features = ["full"] }
 dirs = "5"
 base64 = "0.21"
 clap = { version = "4", features = ["derive"] }
+num_cpus = "1.16"
+rayon = "1.10"
+windows-sys = { version = "0.52", features = [
+    "Win32_Storage_FileSystem",
+    "Win32_System_IO",
+    "Win32_Foundation",
+    "Win32_System_Kernel",
+    "Win32_System_Ioctl",
+    "Win32_System_SystemInformation",
+] }
