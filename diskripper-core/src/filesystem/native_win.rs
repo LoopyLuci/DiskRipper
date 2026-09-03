@@ -29,6 +29,16 @@ pub struct NativeDriveHandle {
 }
 
 impl NativeDriveHandle {
+    /// Get the raw handle
+    pub fn handle(&self) -> Found::HANDLE {
+        self.handle
+    }
+    
+    /// Get the drive path
+    pub fn path(&self) -> &str {
+        &self.path
+    }
+
     /// Open a drive for raw reading (e.g., "D:" or "D:\\" or "\\\\.\\D:")
     pub fn open(drive_path: &str) -> io::Result<Self> {
         let wide_path = Self::to_raw_device_path(drive_path);

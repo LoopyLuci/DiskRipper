@@ -3,6 +3,7 @@ pub mod audio;
 pub mod audio_cd;
 pub mod disc;
 pub mod drive;
+pub mod drive_control;
 pub mod error;
 pub mod extract;
 pub mod flac;
@@ -21,6 +22,7 @@ pub mod settings;
 pub mod types;
 
 pub use accurip::{AccurateRipVerifier, AccurateRipResult, AccurateRipEntry, AccurateRipChecksum, calculate_crc32, calculate_file_crc32};
+pub use drive_control::{DriveController, DiscQualityScanner, ParanoidRipper, ParanoidConfig, DiscQuality, SectorQuality};
 pub use drive::{DriveInfo, DriveScanner};
 pub use disc::{DiscInfo, DiscType};
 pub use error::DiskRipperError;
