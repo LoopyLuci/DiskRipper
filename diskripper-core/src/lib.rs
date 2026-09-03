@@ -1,6 +1,7 @@
 pub mod accurip;
 pub mod audio;
 pub mod audio_cd;
+pub mod crash_reporting;
 pub mod disc;
 pub mod drive;
 pub mod drive_control;
