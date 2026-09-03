@@ -9,7 +9,7 @@ pub mod extract;
 pub mod flac;
 pub mod filesystem;
 pub mod formats;
-pub mod image;
+pub mod icons;
 pub mod job;
 pub mod logging;
 pub mod media;
