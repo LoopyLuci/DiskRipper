@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { Play, Trash2, X, CheckCircle, AlertCircle, Clock, Loader } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { Play, Trash2, X, CheckCircle, AlertCircle, Clock, Loader, Zap, HardDrive } from 'lucide-react'
 import { useAppStore, type Job } from '../store'
 
 function StatusIcon({ status }: { status: string }) {
@@ -18,26 +18,95 @@ function StatusIcon({ status }: { status: string }) {
   }
 }
 
+function formatBytes(bytes: number): string {
+  if (bytes === 0) return '0 B'
+  const k = 1024
+  const sizes = ['B', 'KB', 'MB', 'GB', 'TB']
+  const i = Math.floor(Math.log(bytes) / Math.log(k))
+  return `${(bytes / Math.pow(k, i)).toFixed(1)} ${sizes[i]}`
+}
+
+function formatDuration(seconds: number): string {
+  if (seconds < 60) return `${Math.floor(seconds)}s`
+  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ${Math.floor(seconds % 60)}s`
+  return `${Math.floor(seconds / 3600)}h ${Math.floor((seconds % 3600) / 60)}m`
+}
+
 function ProgressBar({ progress }: { progress: Job['progress'] }) {
   const percent = progress.bytes_total > 0
     ? Math.min(100, (progress.bytes_processed / progress.bytes_total) * 100)
     : 0
 
+  const speed = progress.speed_bytes_per_sec
+  const eta = progress.eta_seconds
+
   return (
-    <div className="mt-2">
+    <div className="mt-3">
       <div className="flex justify-between text-xs text-slate-400 mb-1">
-        <span>{progress.phase}</span>
-        <span>{percent.toFixed(1)}%</span>
+        <span className="flex items-center gap-1">
+          <Zap size={10} className="text-yellow-400" />
+          {progress.phase}
+        </span>
+        <span className="font-mono">{percent.toFixed(1)}%</span>
       </div>
-      <div className="h-1.5 bg-[#334155] rounded-full overflow-hidden">
+      <div className="h-2 bg-[#334155] rounded-full overflow-hidden">
         <div
-          className="h-full bg-blue-500 rounded-full transition-all duration-300"
+          className="h-full bg-gradient-to-r from-blue-500 to-cyan-400 rounded-full transition-all duration-300"
           style={{ width: `${percent}%` }}
         />
       </div>
-      <div className="flex justify-between text-xs text-slate-500 mt-1">
-        <span>{(progress.bytes_processed / 1024 / 1024).toFixed(1)} MB / {(progress.bytes_total / 1024 / 1024).toFixed(1)} MB</span>
-        <span>{progress.speed_bytes_per_sec > 0 ? `${(progress.speed_bytes_per_sec / 1024 / 1024).toFixed(1)} MB/s` : ''}</span>
+      <div className="grid grid-cols-3 gap-2 mt-2 text-xs">
+        <div className="bg-[#0f172a] rounded px-2 py-1">
+          <div className="text-slate-500">Processed</div>
+          <div className="text-slate-200 font-mono">{formatBytes(progress.bytes_processed)}</div>
+        </div>
+        <div className="bg-[#0f172a] rounded px-2 py-1">
+          <div className="text-slate-500">Speed</div>
+          <div className="text-green-400 font-mono">
+            {speed > 0 ? `${formatBytes(speed)}/s` : '-'}
+          </div>
+        </div>
+        <div className="bg-[#0f172a] rounded px-2 py-1">
+          <div className="text-slate-500">ETA</div>
+          <div className="text-cyan-400 font-mono">
+            {eta && eta > 0 ? formatDuration(eta) : '-'}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function SystemInfo() {
+  const { systemInfo } = useAppStore()
+  
+  if (!systemInfo) return null
+  
+  return (
+    <div className="bg-[#1e293b] rounded-xl p-4 border border-[#334155]">
+      <h3 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
+        <HardDrive size={14} />
+        System
+      </h3>
+      <div className="grid grid-cols-2 gap-2 text-xs">
+        <div className="bg-[#0f172a] rounded px-2 py-1.5">
+          <div className="text-slate-500">CPU Cores</div>
+          <div className="text-slate-200">{systemInfo.num_cpus} logical / {systemInfo.num_physical_cpus} physical</div>
+        </div>
+        <div className="bg-[#0f172a] rounded px-2 py-1.5">
+          <div className="text-slate-500">Memory</div>
+          <div className="text-slate-200">{formatBytes(systemInfo.total_memory_bytes)} total</div>
+        </div>
+        {systemInfo.gpu_devices.length > 0 && (
+          <div className="col-span-2 bg-[#0f172a] rounded px-2 py-1.5">
+            <div className="text-slate-500">GPU</div>
+            <div className="text-slate-200">
+              {systemInfo.gpu_devices.map(g => 
+                `${g.name} (${g.platform}, ${formatBytes(g.memory_bytes)})`
+              ).join(', ')}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )
@@ -76,6 +145,8 @@ export function JobPanel() {
           </button>
         </div>
       </div>
+
+      <SystemInfo />
 
       {filteredJobs.length === 0 ? (
         <div className="bg-[#1e293b] rounded-xl p-8 text-center border border-[#334155]">

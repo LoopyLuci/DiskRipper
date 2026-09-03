@@ -50,6 +50,25 @@ export interface Settings {
   log_level: string
   enable_audio_cd: boolean
   jitter_correction: boolean
+  max_concurrent_jobs: number
+  enable_parallel: boolean
+  theme: string
+  language: string
+}
+
+export interface SystemInfo {
+  num_cpus: number
+  num_physical_cpus: number
+  total_memory_bytes: number
+  available_memory_bytes: number
+  gpu_devices: GpuDevice[]
+}
+
+export interface GpuDevice {
+  name: string
+  vendor: string
+  memory_bytes: number
+  platform: string
 }
 
 export interface Toast {
@@ -66,6 +85,7 @@ interface AppState {
   loading: boolean
   error: string | null
   settings: Settings | null
+  systemInfo: SystemInfo | null
   audioTracks: AudioTrack[]
   toasts: Toast[]
   
@@ -84,6 +104,7 @@ interface AppState {
   loadSettings: () => Promise<void>
   saveSettings: (settings: Settings) => Promise<void>
   resetSettings: () => Promise<void>
+  loadSystemInfo: () => Promise<void>
   
   loadAudioTracks: (driveId: string) => Promise<void>
   extractAudioTrack: (driveId: string, trackNumber: number, outputPath: string) => Promise<void>
@@ -104,6 +125,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   loading: false,
   error: null,
   settings: null,
+  systemInfo: null,
   audioTracks: [],
   toasts: [],
 
@@ -227,6 +249,16 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
   },
 
+  loadSystemInfo: async () => {
+    try {
+      const info = await invoke<SystemInfo>('get_system_info')
+      set({ systemInfo: info })
+    } catch (e) {
+      // System info is optional, don't show error
+      console.debug('System info not available:', e)
+    }
+  },
+
   loadAudioTracks: async (driveId) => {
     try {
       const tracks = await invoke<AudioTrack[]>('get_audio_tracks', { driveId })
@@ -281,6 +313,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     await get().refreshDrives()
     await get().refreshJobs()
     await get().loadSettings()
+    await get().loadSystemInfo()
     
     const settings = get().settings
     if (settings) {
