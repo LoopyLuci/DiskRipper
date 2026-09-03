@@ -5,6 +5,7 @@ pub mod audio_fingerprint;
 pub mod music_identification;
 pub mod video_fingerprint;
 pub mod content_classifier;
+pub mod feature_extraction;
 pub mod hybrid_identifier;
 pub mod self_learning;
 pub mod data_management;
