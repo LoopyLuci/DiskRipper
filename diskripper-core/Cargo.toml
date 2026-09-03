@@ -32,6 +32,7 @@ base64.workspace = true
 clap.workspace = true
 num_cpus.workspace = true
 rayon.workspace = true
+fastrand.workspace = true
 rand.workspace = true
 windows-sys = { workspace = true }
 

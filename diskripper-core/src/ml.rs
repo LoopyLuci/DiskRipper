@@ -10,6 +10,7 @@ pub mod self_learning;
 pub mod data_management;
 pub mod model_versioning;
 pub mod inference;
+pub mod training;
 
 pub use pipeline::{MlPipeline, PipelineConfig, PipelineResult, ContentType, IdentificationSource};
 pub use audio_fingerprint::{AudioFingerprint, AudioFingerprinter, FingerprintMatch};
