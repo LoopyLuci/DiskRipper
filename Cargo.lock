@@ -759,6 +759,7 @@ dependencies = [
  "bytes",
  "chrono",
  "clap",
+ "crc32fast",
  "dirs 5.0.1",
  "filetime",
  "flate2",

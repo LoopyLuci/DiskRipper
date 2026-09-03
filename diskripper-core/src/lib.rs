@@ -1,3 +1,4 @@
+pub mod accurip;
 pub mod audio;
 pub mod audio_cd;
 pub mod disc;
@@ -17,6 +18,7 @@ pub mod rip;
 pub mod settings;
 pub mod types;
 
+pub use accurip::{AccurateRipVerifier, AccurateRipResult, AccurateRipEntry, AccurateRipChecksum, calculate_crc32, calculate_file_crc32};
 pub use drive::{DriveInfo, DriveScanner};
 pub use disc::{DiscInfo, DiscType};
 pub use error::DiskRipperError;
