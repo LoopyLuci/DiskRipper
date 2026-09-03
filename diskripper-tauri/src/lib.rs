@@ -120,7 +120,7 @@ fn reset_settings(state: State<'_, SettingsState>) -> Result<Settings, String> {
     manager
         .lock()
         .unwrap()
-        .reset_to_defaults()
+        .reset()
         .map_err(|e| format!("Failed to reset settings: {}", e))?;
     Ok(manager.lock().unwrap().get())
 }
@@ -171,7 +171,7 @@ fn get_audio_tracks(
     drive_id: String,
     engine: State<'_, RipEngine>,
 ) -> Result<Vec<serde_json::Value>, String> {
-    use diskripper_core::audio::AudioCdReader;
+    use diskripper_core::audio_cd::AudioCdRipper;
 
     let drive = engine
         .drives()
@@ -179,25 +179,34 @@ fn get_audio_tracks(
         .find(|d| d.id == drive_id)
         .ok_or("Drive not found")?;
 
-    let mut reader = AudioCdReader::new(drive.path, 0);
-    let tracks = reader
-        .parse_toc()
-        .map_err(|e| format!("Failed to parse TOC: {}", e))?;
+    #[cfg(target_os = "windows")]
+    {
+        use diskripper_core::filesystem::native_win::NativeDriveHandle;
+        let handle = NativeDriveHandle::open(&drive.path)
+            .map_err(|e| format!("Failed to open drive: {}", e))?;
+        let tracks = AudioCdRipper::get_tracks(&handle)
+            .map_err(|e| format!("Failed to get tracks: {}", e))?;
 
-    let result: Vec<serde_json::Value> = tracks
-        .iter()
-        .map(|t| {
-            serde_json::json!({
-                "track_number": t.track_number,
-                "start_sector": t.start_sector,
-                "end_sector": t.end_sector,
-                "duration_seconds": t.duration_seconds,
-                "is_audio": t.is_audio,
+        let result: Vec<serde_json::Value> = tracks
+            .iter()
+            .map(|t| {
+                serde_json::json!({
+                    "track_number": t.track_number,
+                    "start_sector": t.start_sector,
+                    "end_sector": t.end_sector,
+                    "duration_seconds": t.duration_seconds,
+                    "is_audio": t.is_audio,
+                })
             })
-        })
-        .collect();
+            .collect();
 
-    Ok(result)
+        Ok(result)
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        Err("Audio track listing only supported on Windows".to_string())
+    }
 }
 
 #[tauri::command]
@@ -207,7 +216,7 @@ fn extract_audio_track_to_wav(
     output_path: String,
     engine: State<'_, RipEngine>,
 ) -> Result<String, String> {
-    use diskripper_core::audio::{extract_audio_track, AudioCdReader};
+    use diskripper_core::audio_cd::AudioCdRipper;
 
     let drive = engine
         .drives()
@@ -215,31 +224,63 @@ fn extract_audio_track_to_wav(
         .find(|d| d.id == drive_id)
         .ok_or("Drive not found")?;
 
-    let mut reader = AudioCdReader::new(drive.path.clone(), 0);
-    let tracks = reader
-        .parse_toc()
-        .map_err(|e| format!("Failed to parse TOC: {}", e))?;
+    #[cfg(target_os = "windows")]
+    {
+        use diskripper_core::filesystem::native_win::NativeDriveHandle;
+        use diskripper_core::progress::ProgressTracker;
+        use diskripper_core::types::JobId;
 
-    let track = tracks
-        .iter()
-        .find(|t| t.track_number == track_number)
-        .ok_or("Track not found")?;
+        let handle = NativeDriveHandle::open(&drive.path)
+            .map_err(|e| format!("Failed to open drive: {}", e))?;
+        let tracks = AudioCdRipper::get_tracks(&handle)
+            .map_err(|e| format!("Failed to get tracks: {}", e))?;
 
-    let num_sectors = track.sector_count();
+        let track = tracks
+            .iter()
+            .find(|t| t.track_number == track_number)
+            .ok_or("Track not found")?;
 
-    extract_audio_track(
-        std::path::Path::new(&drive.path),
-        track.start_sector,
-        num_sectors,
-        std::path::Path::new(&output_path),
-        true,
-    )
-    .map_err(|e| format!("Failed to extract track: {}", e))?;
+        let job_id = JobId::new();
+        let progress = ProgressTracker::new(job_id, track.sector_count * 2352, 1);
 
-    Ok(format!(
-        "Track {} extracted to {}",
-        track_number, output_path
-    ))
+        AudioCdRipper::rip_track_wav(
+            &handle,
+            track,
+            std::path::Path::new(&output_path),
+            &progress,
+        )
+        .map_err(|e| format!("Failed to extract track: {}", e))?;
+
+        Ok(format!("Track {} extracted to {}", track_number, output_path))
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        Err("Audio extraction only supported on Windows".to_string())
+    }
+}
+
+#[tauri::command]
+fn get_system_info() -> serde_json::Value {
+    use diskripper_core::parallel::HardwareManager;
+    
+    let manager = HardwareManager::detect();
+    let info = manager.system_info;
+    
+    serde_json::json!({
+        "num_cpus": info.num_cpus,
+        "num_physical_cpus": info.num_physical_cpus,
+        "total_memory_bytes": info.total_memory_bytes,
+        "available_memory_bytes": info.available_memory_bytes,
+        "gpu_devices": info.gpu_devices.iter().map(|g| {
+            serde_json::json!({
+                "name": g.name,
+                "vendor": g.vendor,
+                "memory_bytes": g.memory_bytes,
+                "platform": g.platform,
+            })
+        }).collect::<Vec<_>>(),
+    })
 }
 
 pub struct SettingsState(std::sync::Mutex<diskripper_core::settings::SettingsManager>);
@@ -283,7 +324,7 @@ pub fn run() {
             diskripper_core::settings::SettingsManager::new(std::env::temp_dir()).unwrap()
         });
 
-    let builder = tauri::Builder::default()
+    tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
@@ -307,9 +348,8 @@ pub fn run() {
             verify_image_rip,
             get_audio_tracks,
             extract_audio_track_to_wav,
-        ]);
-
-    builder
+            get_system_info,
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

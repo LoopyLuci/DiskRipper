@@ -57,11 +57,17 @@
     ],
     "security": {
       "csp": null
+    },
+    "trayIcon": {
+      "iconPath": "icons/32x32.png",
+      "iconAsTemplate": true,
+      "title": "DiskRipper",
+      "tooltip": "DiskRipper - Media Backup"
     }
   },
   "plugins": {
     "updater": {
-      "active": false,
+      "active": true,
       "endpoints": [
         "https://github.com/LoopyLuci/DiskRipper/releases/latest/download/latest.json"
       ],
