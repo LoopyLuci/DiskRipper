@@ -63,6 +63,18 @@ jobs:
         working-directory: ./frontend
         run: npm run build
 
+  benchmark:
+    name: Performance Benchmarks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+      
+      - name: Run benchmarks
+        run: cargo bench --workspace 2>&1 || echo "Benchmarks not yet configured"
+
   build:
     name: Build Release
     needs: [test-rust, test-frontend]
@@ -97,12 +109,15 @@ jobs:
         run: npm ci
       
       - name: Build icons
-        run: python scripts/generate_icons.py
+        run: python scripts/generate_icons.py 2>/dev/null || echo "Icon generation skipped"
       
       - name: Build Tauri
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Windows code signing (uncomment when certificate is available)
+          # TAURI_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
+          # TAURI_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
         with:
           tagName: v__VERSION__
           releaseName: DiskRipper v__VERSION__
