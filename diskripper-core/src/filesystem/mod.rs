@@ -8,6 +8,12 @@ pub mod verify;
 #[cfg(target_os = "windows")]
 pub mod native_win;
 
+#[cfg(target_os = "linux")]
+pub mod linux_sg;
+
+#[cfg(target_os = "macos")]
+pub mod macos_iokit;
+
 pub use iso9660::Iso9660Reader;
 pub use udf::UdfReader;
 pub use raw_io::{RawDiscReader, RawDiscError};
@@ -16,6 +22,12 @@ pub use verify::{verify_file_rip, verify_disc_image, verify_audio_accuracy, Veri
 
 #[cfg(target_os = "windows")]
 pub use native_win::{NativeDriveHandle, ThreadSafeDriveHandle, detect_disc_type, read_sectors_with_recovery, BadSectorConfig, DiscTypeInfo, DiscFilesystem, TocTrack};
+
+#[cfg(target_os = "linux")]
+pub use linux_sg::{is_sg_io_available, TocTrack as LinuxTocTrack, TocData as LinuxTocData};
+
+#[cfg(target_os = "macos")]
+pub use macos_iokit::{is_iokit_available, TocTrack as MacTocTrack, TocData as MacTocData};
 
 use crate::error::DiskRipperError;
 use crate::types::FileEntry;
@@ -49,13 +61,11 @@ pub struct VolumeInfo {
 
 pub fn detect_filesystem(data: &[u8]) -> FilesystemType {
     // ISO 9660 primary volume descriptor at sector 16 (LBA 16)
-    // Offset 0x8000 = sector 16 * 2048 bytes
     if data.len() > 0x8010 {
         let sig = &data[0x8001..0x8006];
         if sig == b"CD001" {
             // Check for Joliet (at 0x8801)
             if data.len() > 0x8810 && &data[0x8801..0x8806] == b"CD001" {
-                // Check Joliet escape sequence at 0x882D
                 if data.len() > 0x8835 {
                     let escape = &data[0x882D..0x8835];
                     if escape.starts_with(&[0x25, 0x2F]) {
