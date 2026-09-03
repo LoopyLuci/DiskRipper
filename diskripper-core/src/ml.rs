@@ -9,6 +9,7 @@ pub mod hybrid_identifier;
 pub mod self_learning;
 pub mod data_management;
 pub mod model_versioning;
+pub mod inference;
 
 pub use pipeline::{MlPipeline, PipelineConfig, PipelineResult, ContentType, IdentificationSource};
 pub use audio_fingerprint::{AudioFingerprint, AudioFingerprinter, FingerprintMatch};
@@ -19,3 +20,4 @@ pub use hybrid_identifier::{HybridIdentifier, IdentificationResult, SignalConfid
 pub use self_learning::{SelfLearning, FeedbackEntry, TrainingBatch, AccuracyMetrics};
 pub use data_management::{DataManager, TrainingSample, DatasetStats};
 pub use model_versioning::{ModelVersioning, ModelVersion};
+pub use inference::{NeuralNetwork, TrainingConfig, TrainingHistory, EpochStats, Layer, build_mlp, build_audio_cnn};
