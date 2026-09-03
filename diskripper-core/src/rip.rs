@@ -7,6 +7,7 @@ use crate::disc::{DiscAnalyzer, DiscInfo, PlatformDiscAnalyzer};
 use crate::drive::{DriveInfo, DriveScanner, PlatformDriveScanner};
 use crate::error::DiskRipperError;
 use crate::extract::Extractor;
+use crate::icons::IconManager;
 use crate::image::Imager;
 use crate::job::{JobManager, JobStatus};
 use crate::types::*;
