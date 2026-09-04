@@ -15,6 +15,7 @@ export interface Job {
   id: string
   name: string
   status: string
+  error?: string
   progress: {
     job_id: string
     phase: string
@@ -33,11 +34,25 @@ export interface Job {
 export interface SystemInfo {
   num_cpus: number
   num_physical_cpus: number
-  total_memory_gb: number
-  available_memory_gb: number
-  gpu_info: string[]
+  total_memory_bytes: number
+  available_memory_bytes: number
+  gpu_devices: GpuInfo[]
   os_name: string
   hostname: string
+}
+
+export interface GpuInfo {
+  name: string
+  platform: string
+  memory_bytes: number
+}
+
+export interface TrackInfo {
+  track_number: number
+  start_lba: number
+  length_lba: number
+  channels: number
+  duration_seconds: number
 }
 
 export interface AppSettings {
@@ -68,26 +83,46 @@ export const DEFAULT_SETTINGS: AppSettings = {
   theme: 'dark',
 }
 
+export interface Toast {
+  id: string
+  message: string
+  type: 'info' | 'success' | 'warning' | 'error'
+}
+
 export interface AppState {
   drives: DriveInfo[]
   jobs: Job[]
   systemInfo: SystemInfo | null
   settings: AppSettings
+  toasts: Toast[]
   loading: boolean
   error: string | null
+  outputPath: string
+  audioTracks: TrackInfo[]
   
   initialize: () => Promise<void>
   refreshDrives: () => Promise<void>
   refreshJobs: () => Promise<void>
   startRip: (driveId: string, outputPath: string) => Promise<string>
+  startImageRip: (driveId: string, outputPath?: string) => Promise<string>
   startExtraction: (driveId: string, outputPath: string) => Promise<string>
   cancelJob: (jobId: string) => Promise<void>
+  removeJob: (jobId: string) => Promise<void>
   analyzeDrive: (driveId: string) => Promise<any>
   loadSettings: () => Promise<void>
   saveSettings: (settings: AppSettings) => Promise<void>
   resetSettings: () => Promise<void>
   setTheme: (theme: 'dark' | 'light') => void
   clearError: () => void
+  addToast: (message: string, type?: 'info' | 'success' | 'warning' | 'error') => void
+  removeToast: (id: string) => void
+  verifyImageRip: (driveId: string, imagePath: string) => Promise<any>
+  selectedDrive: string | null
+  setSelectedDrive: (driveId: string | null) => void
+  selectDrive: (driveId: string) => void
+  setOutputPath: (path: string) => void
+  loadAudioTracks: (driveId: string) => Promise<void>
+  extractAudioTrack: (driveId: string, trackNumber: number, outputPath: string) => Promise<string>
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
@@ -95,8 +130,12 @@ export const useAppStore = create<AppState>((set, get) => ({
   jobs: [],
   systemInfo: null,
   settings: { ...DEFAULT_SETTINGS, theme: (localStorage.getItem('diskripper-theme') as 'dark' | 'light') || 'dark' },
+  toasts: [],
   loading: false,
   error: null,
+  selectedDrive: null,
+  outputPath: '',
+  audioTracks: [],
 
   initialize: async () => {
     const savedTheme = localStorage.getItem('diskripper-theme') as 'dark' | 'light' | null
@@ -141,6 +180,13 @@ export const useAppStore = create<AppState>((set, get) => ({
     return jobId
   },
 
+  startImageRip: async (driveId: string, outputPath?: string) => {
+    const out = outputPath || get().outputPath || `C:\\DiskRipper\\${driveId.replace(':', '')}.iso`
+    const jobId = await invoke<string>('start_image_rip', { driveId, outputPath: out })
+    await get().refreshJobs()
+    return jobId
+  },
+
   startExtraction: async (driveId: string, outputPath: string) => {
     const jobId = await invoke<string>('start_extraction', { driveId, outputPath })
     await get().refreshJobs()
@@ -149,6 +195,11 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   cancelJob: async (jobId: string) => {
     await invoke('cancel_job', { jobId })
+    await get().refreshJobs()
+  },
+
+  removeJob: async (jobId: string) => {
+    await invoke('remove_job', { jobId })
     await get().refreshJobs()
   },
 
@@ -185,4 +236,43 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   clearError: () => set({ error: null }),
+
+  addToast: (message: string, type: 'info' | 'success' | 'warning' | 'error' = 'info') => {
+    const toast: Toast = { id: Date.now().toString(), message, type }
+    set((state) => ({ toasts: [...state.toasts, toast] }))
+    setTimeout(() => { get().removeToast(toast.id) }, 5000)
+  },
+
+  removeToast: (id: string) => {
+    set((state) => ({ toasts: state.toasts.filter((t) => t.id !== id) }))
+  },
+
+  verifyImageRip: async (driveId: string, imagePath: string) => {
+    return await invoke('verify_image', { driveId, imagePath })
+  },
+
+  setSelectedDrive: (driveId: string | null) => {
+    set({ selectedDrive: driveId })
+  },
+
+  selectDrive: (driveId: string) => {
+    set({ selectedDrive: driveId })
+  },
+
+  setOutputPath: (path: string) => {
+    set({ outputPath: path })
+  },
+
+  loadAudioTracks: async (driveId: string) => {
+    try {
+      const tracks = await invoke<TrackInfo[]>('list_audio_tracks', { driveId })
+      set({ audioTracks: tracks })
+    } catch (e) {
+      console.log('Failed to load audio tracks:', e)
+    }
+  },
+
+  extractAudioTrack: async (driveId: string, trackNumber: number, outputPath: string) => {
+    return await invoke<string>('extract_audio_track', { driveId, trackNumber, outputPath })
+  },
 }))
