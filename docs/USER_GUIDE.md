@@ -1,201 +1,362 @@
-# DiskRipper User Documentation
+# DiskRipper User Guide
+
+DiskRipper is a cross-platform desktop application for backing up optical media (CDs, DVDs, Blu-rays) with AI-powered content identification and smart organization.
 
 ## Table of Contents
 
-1. [Quick Start](#quick-start)
-2. [User Guide](#user-guide)
-3. [FAQ](#faq)
-4. [Troubleshooting](#troubleshooting)
+1. [Installation](#installation)
+2. [Quick Start](#quick-start)
+3. [Features](#features)
+4. [Using the GUI](#using-the-gui)
+5. [Using the CLI](#using-the-cli)
+6. [Using the MCP Server](#using-the-mcp-server)
+7. [ML Content Identification](#ml-content-identification)
+8. [Settings](#settings)
+9. [Keyboard Shortcuts](#keyboard-shortcuts)
+10. [Troubleshooting](#troubleshooting)
+11. [FAQ](#faq)
+
+---
+
+## Installation
+
+### Windows
+
+1. Download the latest `.msi` installer from [GitHub Releases](https://github.com/LoopyLuci/DiskRipper/releases)
+2. Run the installer and follow the prompts
+3. Launch DiskRipper from the Start menu
+
+**Note:** Windows SmartScreen may warn about an unsigned application. Click "More info" → "Run anyway" until we obtain a code signing certificate.
+
+### macOS
+
+1. Download the latest `.dmg` from [GitHub Releases](https://github.com/LoopyLuci/DiskRipper/releases)
+2. Open the DMG and drag DiskRipper to Applications
+3. Launch from Applications
+
+### Linux
+
+1. Download the latest `.AppImage` or `.deb` from [GitHub Releases](https://github.com/LoopyLuci/DiskRipper/releases)
+2. For AppImage: `chmod +x DiskRipper.AppImage && ./DiskRipper.AppImage`
+3. For DEB: `sudo dpkg -i diskripper.deb`
 
 ---
 
 ## Quick Start
 
-### Installation
-
-#### Windows
-1. Download `DiskRipper-0.1.0-x64.msi` from the [Releases](https://github.com/LoopyLuci/DiskRipper/releases) page
-2. Run the installer and follow the prompts
-3. Launch DiskRipper from the Start Menu
-
-#### macOS
-1. Download `DiskRipper-0.1.0.dmg` from the Releases page
-2. Open the DMG and drag DiskRipper to Applications
-3. Launch from Applications (may need to right-click → Open for first launch)
-
-#### Linux
-**AppImage:**
-```bash
-chmod +x DiskRipper-0.1.0.AppImage
-./DiskRipper-0.1.0.AppImage
-```
-
-**Debian/Ubuntu:**
-```bash
-sudo dpkg -i diskripper_0.1.0_amd64.deb
-sudo apt-get install -f
-```
-
-### First Launch
-
-1. Insert an optical disc (CD, DVD, or Blu-ray)
-2. Open DiskRipper
-3. Click **Refresh** to detect your drive
-4. Select the drive from the list
-5. Choose your action:
-   - **Create Image** — Save the entire disc as an ISO file
-   - **Extract Files** — Copy individual files from the disc
-   - **Audio CD** — Rip audio tracks to WAV files
-6. Set the output path
-7. Click the action button to start
+1. **Insert a disc** into your optical drive
+2. **Open DiskRipper** — the app automatically detects drives
+3. **Select your drive** from the Drives panel
+4. **Choose output location** in Settings or use the default
+5. **Click "Rip"** to create an ISO image, or **"Extract"** to copy files
+6. **Wait for completion** — progress shows speed, ETA, and bytes processed
 
 ---
 
-## User Guide
+## Features
 
-### Creating a Disc Image
+### Disc Support
 
-1. Select a drive with a disc inserted
-2. Click **Create Image** in the Rip Configuration panel
-3. Set the output path (e.g., `~/Documents/backup.iso`)
-4. Click **Create Image** to start
-5. Monitor progress in the **Jobs** tab
+| Media Type | Read | Verify | Extract |
+|------------|------|--------|---------|
+| CD-DA (Audio CD) | ✅ | ✅ | ✅ |
+| CD-ROM (Data) | ✅ | ✅ | ✅ |
+| CD-R / CD-RW | ✅ | ✅ | ✅ |
+| DVD-ROM | ✅ | ✅ | ✅ |
+| DVD±R / DVD±RW | ✅ | ✅ | ✅ |
+| DVD-DL (Dual Layer) | ✅ | ✅ | ✅ |
+| Blu-ray | ✅ | ✅ | ✅ |
+| Blu-ray DL | ✅ | ✅ | ✅ |
+| Mixed Mode CD | ✅ | ✅ | ✅ |
+| Enhanced CD | ✅ | ✅ | ✅ |
+| CD-i | ✅ | ✅ | ✅ |
 
-**Supported output formats:**
-- ISO (default)
-- BIN/CUE (for audio CDs)
+### Filesystems Supported
 
-### Extracting Files
+- **ISO 9660** (with Joliet, Rock Ridge extensions)
+- **UDF** (1.02 through 2.60)
+- **HFS / HFS+** (Macintosh)
+- **Hybrid** (ISO + HFS)
+- **DVD-Video** (VOB/IFO parser)
+- **Blu-ray** (BDMV parser)
 
-1. Select a drive with a data disc
-2. Click **Extract Files** in the Rip Configuration panel
-3. Set the output directory
-4. Click **Extract Files** to start
-5. Files are copied preserving the directory structure
+### Audio Formats
 
-### Ripping Audio CDs
+- **WAV** (44.1kHz/16-bit/stereo, CD-quality)
+- **FLAC** (lossless compression)
+- **CUE sheets** (with track timestamps)
+
+---
+
+## Using the GUI
+
+### Drives Panel
+
+The Drives panel shows all detected optical drives and their status.
+
+- **Drive icon** — optical drive detected
+- **Disc indicator** — disc is loaded
+- **Drive type** — CD, DVD, or Blu-ray
+- **Disc info** — type, size, filesystem, tracks
+
+**Actions:**
+- Click a drive to select it
+- Click "Refresh" to rescan drives
+- Click "Analyze" to get detailed disc information
+
+### Jobs Panel
+
+The Jobs panel shows all active and completed jobs.
+
+**Job statuses:**
+- 🟡 **Waiting** — queued to start
+- 🔵 **Running** — in progress
+- 🟢 **Completed** — finished successfully
+- 🔴 **Failed** — error occurred
+- ⚪ **Cancelled** — user cancelled
+
+**Actions:**
+- Filter jobs by status
+- Cancel running jobs
+- Remove completed jobs from list
+- View error details for failed jobs
+
+### Audio CD Panel
+
+Extract individual tracks from audio CDs.
 
 1. Select a drive with an audio CD
-2. Click the **Audio CD** tab in the sidebar
-3. Click **Load Tracks** to read the Table of Contents
-4. Select a track (or leave empty for all tracks)
-5. Set the output path
-6. Click **Extract Track to WAV**
+2. Click "Load Tracks" to read the TOC
+3. Select a track
+4. Choose output format (WAV or FLAC)
+5. Click "Extract" to save the track
 
-### Verifying a Rip
+**Features:**
+- Automatic track detection
+- CD-Text reading (artist, album, track names)
+- CUE sheet generation
+- Jitter correction for accurate rips
 
-1. Create an image of a disc
-2. Go to the **Verify** tab
-3. Select the same drive
-4. Enter the path to the image file
-5. Click **Verify Image**
-6. Review the results — green checkmarks indicate matching sectors
+### Verify Panel
 
-### Settings
+Verify ripped images against the original disc.
 
-Access settings from the **Settings** tab:
+1. Select a drive with the original disc
+2. Browse for the image file to verify
+3. Click "Verify" to start comparison
 
-| Setting | Description | Default |
-|---------|-------------|---------|
-| Default Output Directory | Where ripped files are saved | `~/DiskRipper` |
-| Read Speed | Drive read speed (None = Maximum) | Maximum |
-| Verify Checksums | Verify after rip | Enabled |
-| Eject After Rip | Auto-eject when done | Disabled |
-| Read Retries | Number of retries on error | 3 |
-| Buffer Size | Read buffer size in MB | 4 |
-| Log Level | Verbosity of logging | Info |
-| Enable Audio CD | Enable audio CD features | Enabled |
-| Jitter Correction | Correct jitter in audio CDs | Enabled |
+**Verification methods:**
+- **CRC32 checksum** — fast, detects data corruption
+- **SHA-256 checksum** — cryptographic, detects any changes
+- **AccurateRip** — compares against database of known good rips
 
-### Command-Line Interface
+### ML Identify Panel
 
-DiskRipper includes a CLI for automation:
+Identify content using machine learning.
+
+1. Select an audio file (WAV format)
+2. Click "Identify Content"
+3. View results: title, artist, album, genre, confidence
+4. Provide feedback to improve ML accuracy
+
+**How it works:**
+- Custom audio fingerprinting identifies music from actual audio
+- Hybrid ML combines fingerprinting + classification + metadata
+- Self-learning pipeline improves from your feedback
+- All processing is local — no external API dependencies
+
+### Settings Panel
+
+Configure DiskRipper behavior.
+
+**Output Settings:**
+- Default output directory
+- Auto-organize ripped files
+
+**Reading Settings:**
+- Read speed (1x to max)
+- Retries on error (0-10)
+- Buffer size (1-64 MB)
+
+**Options:**
+- Verify checksums after rip
+- Eject disc after completion
+- Enable audio CD extraction
+- Jitter correction (audio CDs)
+
+**Logging:**
+- Log level (Trace, Debug, Info, Warn, Error)
+
+**Theme:**
+- Dark or Light appearance
+
+---
+
+## Using the CLI
+
+DiskRipper includes a command-line interface for automation and scripting.
+
+### Commands
 
 ```bash
-# List drives
+# List all optical drives
 diskripper list-drives
 
-# Rip a disc
-diskripper rip --drive D: --output ./backup.iso --verify
+# Get drive information
+diskripper drive-info <drive_id>
 
-# Extract files
-diskripper extract --drive D: --output ./files/
+# Rip disc to ISO image
+diskripper rip --drive D: --output disc.iso
 
-# Rip audio CD
-diskripper audio --drive D: --output ./music/ --track 1
+# Rip with auto-organization
+diskripper rip --drive D: --output disc.iso --auto-organize
 
-# Verify image
-diskripper verify --drive D: --image ./backup.iso
+# Extract files from disc
+diskripper extract --drive D: --output ./extracted/
 
-# Show disc info
-diskripper info --drive D:
+# Verify image against disc
+diskripper verify --drive D: --image disc.iso
 
-# List jobs
-diskripper list-jobs
+# List all jobs
+diskripper jobs
 
-# Cancel job
-diskripper cancel-job <job-id>
+# Get job status
+diskripper job-status <job_id>
+
+# Cancel a job
+diskripper cancel-job <job_id>
+
+# Batch rip multiple drives
+diskripper batch-rip --drives D:,E: --output-dir ./rips/
+
+# Output as JSON (for automation)
+diskripper --json list-drives
+```
+
+### Examples
+
+```bash
+# Rip a DVD and auto-organize
+diskripper rip --drive E: --output "C:\Rips\movie.iso" --auto-organize
+
+# Extract audio CD to WAV
+diskripper extract --drive D: --output "C:\Music\Album/"
+
+# Verify a rip
+diskripper verify --drive D: --image "C:\Rips\disc.iso"
+
+# Script: rip all discs
+for drive in $(diskripper --json list-drives | jq -r '.[].id'); do
+    diskripper rip --drive "$drive" --output "C:\Rips\${drive}.iso"
+done
 ```
 
 ---
 
-## FAQ
+## Using the MCP Server
 
-**Q: What disc types are supported?**
-A: CD-ROM, CD-R, CD-RW, DVD-ROM, DVD-R, DVD-RW, DVD+R, DVD+RW, DVD-RAM, DVD+R DL, BD-ROM, BD-R, BD-RE, BD-R DL, and HD DVD.
+DiskRipper includes an MCP (Model Context Protocol) server for AI agent integration.
 
-**Q: Can I rip copy-protected discs?**
-A: DiskRipper can read discs with structural protections (bad sectors, hidden tracks). CSS/AACS decryption requires system-installed libraries (libdvdcss, libaacs).
+### Setup
 
-**Q: Why is my rip failing?**
-A: Common causes:
-- Scratched or damaged disc (increase retries in settings)
-- Dirty lens (clean your drive)
-- Incompatible drive (check compatibility list)
-- Insufficient disk space
+The MCP server is automatically registered with Hermes Agent. For other agents, add to your MCP config:
 
-**Q: What is AccurateRip?**
-A: AccurateRip is a database of checksums from other users' rips. If your rip matches, it's verified accurate. DiskRipper calculates AccurateRip-style checksums for verification.
+```json
+{
+  "mcpServers": {
+    "diskripper": {
+      "command": "node",
+      "args": ["C:/Projects/DiskRipper/packages/mcp-server/dist/cli.js"]
+    }
+  }
+}
+```
 
-**Q: How do I report a bug?**
-A: Use the feedback form in the app (Help → Send Feedback) or open an issue on GitHub.
+### Available Tools
 
-**Q: Is DiskRipper free?**
-A: Yes, DiskRipper is open source under the MIT license.
+| Tool | Description |
+|------|-------------|
+| `list_drives` | List all optical drives |
+| `drive_info` | Get detailed drive information |
+| `rip_disc` | Rip a disc to ISO image |
+| `extract_files` | Extract files from disc |
+| `rip_audio_cd` | Rip audio CD to WAV |
+| `verify_image` | Verify image against disc |
+| `list_jobs` | List all jobs |
+| `job_status` | Get job status |
+| `job_history` | Get job history |
+
+### Example Agent Usage
+
+```
+User: "Rip the disc in drive D:"
+Agent: [Calls rip_disc tool]
+Agent: "Disc ripped successfully. Job ID: abc-123"
+
+User: "What's the status?"
+Agent: [Calls job_status tool]
+Agent: "Job abc-123 is 45% complete, running at 12 MB/s"
+```
 
 ---
 
-## Troubleshooting
+## ML Content Identification
 
-### Drive Not Detected
-- Ensure the drive is properly connected
-- Try refreshing the drive list
-- Check if the drive appears in your OS's device manager
-- Some USB drives require external power
+### How It Works
 
-### Read Errors
-- Clean the disc with a soft cloth
-- Try a slower read speed
-- Increase the retry count in settings
-- Try a different drive
+1. **Audio Fingerprinting** — Generates compact fingerprints from audio using spectral peak analysis
+2. **Hybrid Identification** — Combines fingerprinting + content classification + metadata lookup
+3. **Confidence Scoring** — Each identification includes a confidence percentage
+4. **Self-Learning** — User feedback improves model accuracy over time
 
-### Slow Performance
-- Enable DMA in your OS settings
-- Close other disk-intensive applications
-- Use a faster drive
-- Reduce read speed if the drive is struggling
+### Supported Content Types
 
-### Audio CD Issues
-- Enable jitter correction in settings
-- Use DAO (Disc-At-Once) mode if available
-- Clean the disc and drive lens
-- Try a different drive offset
+| Type | Identification | Organization |
+|------|---------------|--------------|
+| Music CD | ✅ Artist, Album, Track | `Music/Artist/Album/Track.ext` |
+| Movie DVD | ✅ Title, Year | `Movies/Title (Year)/Title.ext` |
+| TV DVD | ✅ Title, Season | `TV Shows/Title/Title.ext` |
+| Software | ✅ Title | `Software/Title/Title.ext` |
+| Game | ✅ Title | `Games/Title/Title.ext` |
 
-### Log Files
-Log files are stored at:
-- **Windows:** `%APPDATA%\DiskRipper\logs\`
-- **macOS:** `~/Library/Logs/DiskRipper/`
-- **Linux:** `~/.local/share/DiskRipper/logs/`
+### Providing Feedback
+
+When ML identification is incorrect:
+
+1. Open the ML Identify panel
+2. View the identification result
+3. Enter the correct information
+4. Click "Submit Feedback"
+
+Your feedback is used to retrain models, improving accuracy for future identifications.
+
+---
+
+## Settings
+
+### Output Settings
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| Default output directory | `C:\DiskRipper` | Where ripped files are saved |
+| Auto-organize | Enabled | Automatically sort ripped files |
+
+### Reading Settings
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| Read speed | Maximum | Disc read speed (1x to max) |
+| Retries on error | 3 | Number of retry attempts |
+| Buffer size | 8 MB | Read buffer size |
+
+### Options
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| Verify checksums | Enabled | Verify after rip |
+| Eject after rip | Disabled | Auto-eject on completion |
+| Audio CD extraction | Enabled | Enable audio CD features |
+| Jitter correction | Enabled | Correct audio CD read errors |
 
 ---
 
@@ -204,39 +365,90 @@ Log files are stored at:
 | Shortcut | Action |
 |----------|--------|
 | `Ctrl+R` | Refresh drives |
-| `Ctrl+N` | New rip |
-| `Ctrl+J` | Focus jobs |
-| `Ctrl+,` | Open settings |
-| `Ctrl+Q` | Quit |
-| `F1` | Help |
-| `F5` | Refresh |
+| `Ctrl+J` | Go to Jobs panel |
+| `Ctrl+,` | Go to Settings |
+| `Ctrl+Shift+F` | Open feedback dialog |
+| `Escape` | Close dialog |
 
 ---
 
-## Supported Formats
+## Troubleshooting
 
-### Input Formats (Read)
-- CD: CD-DA, CD-ROM, CD-R, CD-RW
-- DVD: DVD-ROM, DVD-R, DVD-RW, DVD+R, DVD+RW, DVD-RAM, DVD+R DL
-- Blu-ray: BD-ROM, BD-R, BD-RE, BD-R DL
-- HD DVD: HD DVD-ROM, HD DVD-R, HD DVD-RW
+### No Drives Detected
 
-### Output Formats (Write)
-- ISO 9660
-- BIN/CUE
-- WAV (audio)
+1. Ensure the drive is connected and powered on
+2. Try refreshing drives (Ctrl+R)
+3. Check Device Manager for driver issues
+3. On Linux, ensure the user is in the `cdrom` group
+
+### Rip Fails with Read Errors
+
+1. Clean the disc surface
+2. Reduce read speed in Settings
+3. Increase retries in Settings
+4. Enable jitter correction for audio CDs
+
+### Verification Fails
+
+1. The disc may be scratched or damaged
+2. Try reducing read speed
+3. Clean the disc and retry
+4. Some copy-protected discs may not verify correctly
+
+### ML Identification is Inaccurate
+
+1. Provide feedback on incorrect identifications
+2. More feedback = better accuracy over time
+3. Short clips (< 5 seconds) may be harder to identify
+
+### Application Won't Start
+
+1. Ensure you have the latest version
+2. Check the log file: `%APPDATA%\DiskRipper\logs\`
+3. Try running from CLI to see error output
 
 ---
 
-## System Requirements
+## FAQ
 
-| Platform | Minimum Version | Architecture |
-|----------|----------------|--------------|
-| Windows | 10 (1903+) | x64 |
-| macOS | 10.15 (Catalina) | x64, ARM64 |
-| Linux | Ubuntu 20.04 / Fedora 34 | x64 |
+**Q: Is DiskRipper free?**
+A: Yes, DiskRipper is open source under the MIT license.
 
-**Hardware:**
-- Optical drive (CD, DVD, or Blu-ray)
-- 100 MB free disk space (for application)
-- Additional space for ripped content
+**Q: Can I rip copy-protected discs?**
+A: DiskRipper can read the data sectors but cannot bypass copy protection. Some discs may not rip correctly.
+
+**Q: Where are ripped files saved?**
+A: By default to `C:\DiskRipper`. You can change this in Settings.
+
+**Q: How do I rip an audio CD to MP3?**
+A: Rip to WAV first, then use a separate encoder (like LAME) to convert to MP3. FLAC output is built-in.
+
+**Q: Can I rip a Blu-ray?**
+A: Yes, DiskRipper supports Blu-ray reading. Note that commercial Blu-rays have copy protection.
+
+**Q: How does ML identification work offline?**
+A: All ML models run locally on your machine. No data is sent to external servers.
+
+**Q: Where is my feedback stored?**
+A: Feedback is stored locally at `%APPDATA%\DiskRipper\feedback\`. It is used to retrain models on your machine.
+
+**Q: Can I use DiskRipper from a script?**
+A: Yes, use the CLI (`diskripper.exe`) with the `--json` flag for machine-readable output.
+
+---
+
+## Support
+
+- **GitHub Issues:** https://github.com/LoopyLuci/DiskRipper/issues
+- **Documentation:** https://github.com/LoopyLuci/DiskRipper/wiki
+- **Discord:** [Join our community](https://discord.gg/diskripper)
+
+---
+
+## License
+
+DiskRipper is licensed under the MIT License. See [LICENSE](../LICENSE) for details.
+
+---
+
+*Last updated: September 2026*
