@@ -1,0 +1,27 @@
+[package]
+name = "diskripper-app"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Native GUI for DiskRipper using egui"
+
+[dependencies]
+diskripper-core = { path = "../diskripper-core" }
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+anyhow.workspace = true
+chrono.workspace = true
+uuid.workspace = true
+egui.workspace = true
+eframe.workspace = true
+egui_extras.workspace = true
+
+[package.metadata.bundle]
+name = "DiskRipper"
+identifier = "com.diskripper.app"
+icon = ["icons/icon.png"]
+category = "Utility"

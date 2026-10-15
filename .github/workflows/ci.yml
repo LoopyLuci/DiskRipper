@@ -18,12 +18,12 @@ jobs:
         os: [ubuntu-latest, windows-latest, macos-latest]
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy, rustfmt
-      
+
       - name: Cache cargo
         uses: actions/cache@v4
         with:
@@ -32,52 +32,31 @@ jobs:
             ~/.cargo/git
             target
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-      
+
       - name: Check formatting
         run: cargo fmt -- --check
-      
+
       - name: Run clippy
         run: cargo clippy --workspace --tests -- -D warnings
-      
+
       - name: Run tests
         run: cargo test --workspace --tests
-
-  test-frontend:
-    name: Test Frontend
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: frontend/package-lock.json
-      
-      - name: Install dependencies
-        working-directory: ./frontend
-        run: npm ci
-      
-      - name: Build
-        working-directory: ./frontend
-        run: npm run build
 
   benchmark:
     name: Performance Benchmarks
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
-      
+
       - name: Run benchmarks
         run: cargo bench --workspace 2>&1 || echo "Benchmarks not yet configured"
 
   build:
     name: Build Release
-    needs: [test-rust, test-frontend]
+    needs: [test-rust]
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -88,60 +67,50 @@ jobs:
             target: x86_64-pc-windows-msvc
           - os: macos-latest
             target: x86_64-apple-darwin
-    
+
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
-      
-      - name: Setup Node
-        uses: actions/setup-node@v4
+
+      - name: Cache cargo
+        uses: actions/cache@v4
         with:
-          node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: frontend/package-lock.json
-      
-      - name: Install frontend dependencies
-        working-directory: ./frontend
-        run: npm ci
-      
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
       - name: Build icons
         run: python scripts/generate_icons.py 2>/dev/null || echo "Icon generation skipped"
-      
-      - name: Build Tauri
-        uses: tauri-apps/tauri-action@v0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # Windows code signing (uncomment when certificate is available)
-          # TAURI_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
-          # TAURI_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
+
+      - name: Build native app
+        run: cargo build --release --target ${{ matrix.target }} -p diskripper-app
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
         with:
-          tagName: v__VERSION__
-          releaseName: DiskRipper v__VERSION__
-          releaseBody: |
-            ## Changes
-            - Built from commit ${{ github.sha }}
-          releaseDraft: true
-          prerelease: false
-          args: --target ${{ matrix.target }}
+          name: diskripper-${{ matrix.target }}
+          path: target/${{ matrix.target }}/release/diskripper-app*
 
   create-release:
     name: Create Release
     needs: build
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
-    
+
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Download artifacts
         uses: actions/download-artifact@v4
         with:
           path: artifacts
-      
+
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:

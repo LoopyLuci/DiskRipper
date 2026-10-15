@@ -120,21 +120,11 @@ Identify content from actual audio — no metadata needed.
 git clone https://github.com/LoopyLuci/DiskRipper.git
 cd DiskRipper
 
-# Install dependencies
-cd frontend && npm install && cd ..
-
 # Build release
-cd diskripper-tauri && cargo build --release
+cargo build --release -p diskripper-app
 
-# Build frontend
-cd ../frontend && npm run build
-```
-
-### Development
-
-```bash
-# Run with hot reload
-cd frontend && npm run tauri dev
+# Run
+cargo run --release -p diskripper-app
 ```
 
 ---
@@ -152,13 +142,10 @@ DiskRipper/
 │   │   ├── rip.rs            # Rip engine
 │   │   └── ...
 │   └── Cargo.toml
-├── diskripper-tauri/         # Tauri 2 shell
-│   ├── src/                  # Tauri commands
-│   └── tauri.conf.json
-├── frontend/                 # React/TypeScript GUI
+├── diskripper-app/           # Native GUI (egui/eframe)
 │   └── src/
-│       ├── components/       # 12+ UI components
-│       └── store.ts          # Zustand store
+│       ├── main.rs           # Entry point
+│       └── ui.rs             # Native UI (6 tabs)
 ├── packages/mcp-server/      # MCP server
 │   └── src/                  # 9 tools
 ├── scripts/                  # Build/packaging
@@ -172,13 +159,9 @@ DiskRipper/
 
 ```
 ┌─────────────────┐     ┌─────────────────┐
-│   GUI (React)   │     │   CLI (clap)    │
+│  GUI (egui)     │     │   CLI (clap)    │
 └────────┬────────┘     └────────┬────────┘
          │                       │
-         └───────────┬───────────┘
-                     │
-         ┌───────────▼───────────┐
-         │   Tauri Commands      │
          └───────────┬───────────┘
                      │
     ┌────────────────┼────────────────┐

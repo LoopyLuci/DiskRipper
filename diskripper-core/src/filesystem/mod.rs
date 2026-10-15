@@ -64,10 +64,11 @@ pub fn detect_filesystem(data: &[u8]) -> FilesystemType {
     if data.len() > 0x8010 {
         let sig = &data[0x8001..0x8006];
         if sig == b"CD001" {
-            // Check for Joliet (at 0x8801)
+            // Check for Joliet (supplementary volume descriptor at sector 17)
             if data.len() > 0x8810 && &data[0x8801..0x8806] == b"CD001" {
-                if data.len() > 0x8835 {
-                    let escape = &data[0x882D..0x8835];
+                // Escape sequences field is at offset 0x58 within the SVD (absolute 0x8858)
+                if data.len() > 0x885B {
+                    let escape = &data[0x8858..0x885B];
                     if escape.starts_with(&[0x25, 0x2F]) {
                         return FilesystemType::Joliet;
                     }

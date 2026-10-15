@@ -1,9 +1,9 @@
 [workspace]
-members = ["diskripper-core", "diskripper-tauri"]
+members = ["diskripper-core", "diskripper-app"]
 resolver = "2"
 
 [workspace.package]
-version = "0.1.0"
+version = "1.0.0"
 edition = "2024"
 license = "MIT"
 repository = "https://github.com/LoopyLuci/DiskRipper"
@@ -39,6 +39,9 @@ num_cpus = "1.16"
 rayon = "1.10"
 fastrand = "2.0"
 rand = "0.8"
+egui = "0.28"
+eframe = { version = "0.28", features = ["default"] }
+egui_extras = "0.28"
 windows-sys = { version = "0.52", features = [
     "Win32_Storage_FileSystem",
     "Win32_System_IO",
