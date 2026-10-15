@@ -33,7 +33,7 @@
 - **Linux** (AppImage, DEB)
 
 ### Interfaces
-- **GUI** — Modern React/TypeScript desktop app (Tauri 2)
+- **GUI** — 100% native desktop app (egui/eframe, no browser engine)
 - **CLI** — Full command-line automation with JSON output
 - **MCP Server** — AI agent integration (Hermes, etc.)
 
